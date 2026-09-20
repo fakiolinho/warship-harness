@@ -89,14 +89,65 @@ jobs:
             exit 1
           fi
 
+  container:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        # SECURITY.md points at this image as the real boundary, so it
+        # cannot go untested. A runner has a Docker daemon even when a
+        # laptop does not.
+        run: docker build -t warship-harness .
+
+      - name: The harness works inside the container
+        run: docker run --rm warship-harness python selfcheck.py
+
+      - name: The mission entrypoint is present and answers
+        # Not the dry run: that imports tests/conftest.py, which imports
+        # pytest, and the image installs requirements.txt only. Putting
+        # test dependencies in the image to test the image is the wrong
+        # trade, so this checks the entrypoint loads and argparse works.
+        run: docker run --rm warship-harness python run.py --help
+
+      - name: A missing mission fails cleanly, not with a traceback
+        run: |
+          out=$(docker run --rm warship-harness \
+                  python run.py missions/nope 2>&1) && status=0 || status=$?
+          echo "$out"
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1"; exit 1; }
+          case "$out" in
+            *"no mission brief"*) ;;
+            *) echo "::error::unexpected failure output"; exit 1 ;;
+          esac
+
+      - name: The agent cannot write outside its workspace
+        # The claim the container is there to make. If a non-root agent
+        # can write to /etc, the boundary is not doing its job.
+        run: |
+          if docker run --rm warship-harness \
+               sh -c 'echo x > /etc/passwd' 2>/dev/null; then
+            echo "::error::container user can write to /etc"
+            exit 1
+          fi
+          echo "confirmed: /etc is not writable by the agent user"
+
   ci-ok:
     name: CI passed
     if: always()
-    needs: [lint, test]
+    needs: [lint, test, container]
     runs-on: ubuntu-latest
     steps:
-      - name: Check results
+      # needs.*.result covers every job listed above, so adding a job
+      # means editing `needs` and nothing else. Naming jobs individually
+      # here meant a new job could fail while this one still reported
+      # success.
+      - name: Fail if any job did not succeed
+        if: contains(needs.*.result, 'failure')
+          || contains(needs.*.result, 'cancelled')
+          || contains(needs.*.result, 'skipped')
         run: |
-          [ "${{ needs.lint.result }}" = "success" ] || exit 1
-          [ "${{ needs.test.result }}" = "success" ] || exit 1
-          echo "all green"
+          echo "::error::a required job did not succeed"
+          exit 1
+      - run: echo "all green"
