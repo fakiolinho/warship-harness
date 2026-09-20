@@ -39,6 +39,7 @@ htmlcov/
 
 # Harness runtime output (regenerated per run; never commit)
 ledger.jsonl
+*_ledger.jsonl
 finops_report.md
 memory/pending.md
 memory/approved.md

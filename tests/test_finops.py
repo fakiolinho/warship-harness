@@ -36,6 +36,8 @@ def test_quadrants(isolated_ledger):
     assert finops.quadrant(
         {"cost": 0.1, "steps_done": 3, "resolved": True}) == "CHEAP WIN"
     assert finops.quadrant(
+        {"cost": 0.1, "steps_done": 3, "resolved": False}) == "CHEAP MISS"
+    assert finops.quadrant(
         {"cost": 2.0, "steps_done": 3, "resolved": True}) == "VELOCITY"
     assert finops.quadrant(
         {"cost": 2.0, "steps_done": 3, "resolved": False}) == "VELOCITY THEATRE"
@@ -93,3 +95,18 @@ def test_older_ledger_rows_without_a_written_key_still_parse(isolated_ledger):
     a = finops.analyze(ledger.read())
     assert a["missions"]["old"]["written"] == 0
     assert a["task_success_rate"] == 1.0
+
+
+def test_a_cheap_failure_is_not_a_win():
+    """Both spend levels split on resolved, or a failing mission that
+    happens to be cheap hides in the rotation forever."""
+    cheap_fail = {"cost": 0.1, "steps_done": 2, "resolved": False}
+    assert finops.quadrant(cheap_fail) != "CHEAP WIN"
+    assert finops.quadrant(cheap_fail) == "CHEAP MISS"
+
+
+def test_every_quadrant_distinguishes_resolved():
+    for cost in (0.1, 5.0):
+        s = {"cost": cost, "steps_done": 3}
+        assert finops.quadrant({**s, "resolved": True}) != finops.quadrant(
+            {**s, "resolved": False})

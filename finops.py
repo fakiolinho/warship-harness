@@ -20,7 +20,9 @@ REPORT_PATH = "finops_report.md"
 def analyze(rows: list[dict]) -> dict:
     m = defaultdict(lambda: {"cost": 0.0, "in": 0, "cached": 0, "written": 0,
                              "out": 0, "calls": 0, "resolved": None,
-                             "steps_done": 0, "interventions": 0})
+                             "steps_done": 0, "interventions": 0,
+                             "resolved_by": "steps", "judge_cost": 0.0,
+                             "judge_score": None})
     for r in rows:
         s = m[r["mission"]]
         if r["kind"] == "call":
@@ -31,10 +33,16 @@ def analyze(rows: list[dict]) -> dict:
             s["written"] += r.get("written", 0)
             s["out"] += r["out"]
             s["calls"] += 1
+        elif r["kind"] == "judge":
+            # Judge spend is real but it is not mission spend. Pooling them
+            # would inflate cost per resolved task with the cost of asking.
+            s["judge_cost"] += r.get("cost", 0.0)
+            s["judge_score"] = r.get("score")
         else:
             s["resolved"] = r["resolved"]
             s["steps_done"] = r["steps_done"]
             s["interventions"] = r["interventions"]
+            s["resolved_by"] = r.get("resolved_by", "steps")
 
     total_cost = sum(s["cost"] for s in m.values())
     resolved = [k for k, s in m.items() if s["resolved"]]
@@ -42,6 +50,8 @@ def analyze(rows: list[dict]) -> dict:
     total_cached = sum(s["cached"] for s in m.values())
     total_written = sum(s["written"] for s in m.values())
     total_iv = sum(s["interventions"] for s in m.values())
+    total_judge = sum(s["judge_cost"] for s in m.values())
+    judged = [k for k, s in m.items() if s["resolved_by"] == "judge"]
     return {
         "missions": dict(m),
         "total_cost": total_cost,
@@ -50,18 +60,25 @@ def analyze(rows: list[dict]) -> dict:
             total_cost / len(resolved) if resolved else float("inf"),
         "cache_hit_rate": total_cached / total_in if total_in else 0.0,
         "cache_written_tokens": total_written,
+        "judge_cost": total_judge,
+        "judged_missions": len(judged),
         "interventions_per_mission": total_iv / len(m) if m else 0.0,
     }
 
 
 def quadrant(s: dict) -> str:
-    """The matrix: spend vs shipped output."""
+    """The matrix: spend vs shipped output, split by whether it resolved.
+
+    Both spend levels split on resolved. A mission that moved and did not
+    finish is not a win at any price: calling a cheap failure a CHEAP WIN
+    is how a failing mission stays in the rotation for months.
+    """
     hot = s["cost"] > HOT_SPEND_USD
     shipped = s["steps_done"] > 0
     if hot and not shipped:
         return "LEAK"
     if not hot and shipped:
-        return "CHEAP WIN"
+        return "CHEAP WIN" if s["resolved"] else "CHEAP MISS"
     if hot and shipped:
         return "VELOCITY" if s["resolved"] else "VELOCITY THEATRE"
     return "IDLE"
@@ -109,11 +126,25 @@ def render(a: dict) -> str:
     note = cache_note(a)
     if note:
         lines += [note, ""]
-    lines += ["| mission | spend | calls | steps | resolved | quadrant |",
-              "|---|---|---|---|---|---|"]
+    lines += ["| mission | spend | calls | steps | resolved | by | quadrant |",
+              "|---|---|---|---|---|---|---|"]
     for k, s in sorted(a["missions"].items()):
+        by = s["resolved_by"]
+        if by == "judge" and s["judge_score"] is not None:
+            by = f"judge {s['judge_score']:.2f}"
         lines.append(f"| {k} | ${s['cost']:.2f} | {s['calls']} | "
-                     f"{s['steps_done']} | {s['resolved']} | {quadrant(s)} |")
+                     f"{s['steps_done']} | {s['resolved']} | {by} | "
+                     f"{quadrant(s)} |")
+    if a["judged_missions"]:
+        lines += ["", f"Judged {a['judged_missions']} of "
+                      f"{len(a['missions'])} missions; grading cost "
+                      f"${a['judge_cost']:.2f}, excluded from mission spend "
+                      f"above."]
+    else:
+        lines += ["", "> Every verdict above is the step count proxy: the "
+                      "agent said STEP n DONE, which is not the same as "
+                      "having done it. Run with `--judge` to grade the "
+                      "transcript instead."]
     return "\n".join(lines)
 
 

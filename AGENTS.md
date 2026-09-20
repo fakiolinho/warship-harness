@@ -82,7 +82,11 @@ to argue for itself explicitly, not slip through.
    because that number feeds the FinOps report.
 
 6. **FinOps math is deterministic Python.** No model call in `finops.py`.
-   Math that goes in front of a board should not hallucinate.
+   Math that goes in front of a board should not hallucinate. The LLM judge
+   does not break this: it runs at *record* time and writes a verdict into
+   the ledger with its model and rubric version, so the report is still pure
+   arithmetic over recorded facts and re-running it on the same ledger gives
+   the same numbers. A judge called from inside the report would break it.
 
 7. **The test suite never calls a model API.** `tests/conftest.py` has a
    `ScriptedModel` that implements `bind_tools`, which is what lets the

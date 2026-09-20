@@ -187,6 +187,55 @@ The report tells you which kind of zero you have: no writes at all means
 caching is off or the prompt is too short; writes with no reads means the
 prefix is drifting between calls, or they are more than 5 minutes apart.
 
+## Grading missions: the step count proxy and the judge
+
+By default a mission counts as resolved when it records as many `STEP n
+DONE` lines as its brief has numbered steps. That is a proxy, and a weak
+one: it knows the agent *said* it finished, not that it did. Both headline
+numbers, task success rate and cost per resolved task, are built on it.
+
+`--judge` replaces the proxy with an LLM reading the transcript against the
+brief:
+
+```bash
+python run.py missions/demo --judge
+```
+
+It grades whether each numbered step genuinely happened, whether the agent's
+claims are supported by what the tools actually returned, and whether it
+stayed inside the brief's constraints. A mission that summarizes truncated
+tool output confidently fails on the second test, which is exactly the
+failure the step count cannot see.
+
+The verdict, its score, the failing step numbers, the judge model, and the
+rubric version all go into the ledger. **`finops.py` still never calls a
+model**: the judge runs at record time and the report stays deterministic
+arithmetic over recorded facts, so re-running it on the same ledger always
+gives the same numbers. `RUBRIC_VERSION` is recorded because changing the
+rubric makes new verdicts incomparable to old ones.
+
+Judge spend is recorded as its own row kind and kept out of mission spend.
+Pooling them would inflate cost per resolved task with the cost of asking
+whether it resolved.
+
+A judge is a measurement, not an oracle. It has its own error rate and it
+costs one extra model call per mission, which is why it is opt in.
+
+## Generating data to play with
+
+One real mission produces a report with one row, which tells you nothing
+about whether the quadrants or the `$1` hot-spend line behave. Fabricate
+some:
+
+```bash
+python seed_ledger.py --out demo_ledger.jsonl --missions 40
+WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
+```
+
+Deterministic from a seed, no model calls, no cost. It refuses to write a
+real ledger: fabricated rows are indistinguishable from real ones the moment
+you look away.
+
 ## Operating cadence
 
 Daily, nothing. The harness runs missions; the gate pages you only on ask

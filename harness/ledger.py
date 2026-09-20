@@ -44,10 +44,34 @@ def record_call(mission: str, model: str, usage: dict, cost_usd: float) -> None:
 
 
 def record_outcome(mission: str, resolved: bool, steps_done: int,
-                   interventions: int) -> None:
+                   interventions: int, resolved_by: str = "steps") -> None:
+    """resolved_by says what decided it: "steps" (the step count proxy) or
+    "judge" (an LLM graded the transcript). Recorded because the two are
+    different measurements and must not be silently pooled."""
     _append({
         "kind": "outcome", "mission": mission, "resolved": resolved,
         "steps_done": steps_done, "interventions": interventions,
+        "resolved_by": resolved_by,
+    })
+
+
+def record_judgement(mission: str, verdict, usage: dict,
+                     cost_usd: float) -> None:
+    """A judge's verdict, with what produced it and what it cost.
+
+    Kept as its own row kind: judge spend is real money but it is not
+    mission spend, so pooling them would corrupt cost per resolved task.
+    """
+    details = usage.get("input_token_details") or {}
+    _append({
+        "kind": "judge", "mission": mission,
+        "model": verdict.model, "rubric": verdict.rubric,
+        "resolved": verdict.resolved, "score": verdict.score,
+        "reasoning": verdict.reasoning, "failed_steps": verdict.failed_steps,
+        "in": usage.get("input_tokens", 0),
+        "out": usage.get("output_tokens", 0),
+        "cached": details.get("cache_read") or 0,
+        "cost": round(cost_usd, 6),
     })
 
 
