@@ -1,0 +1,2 @@
+langchain>=1.4
+langchain-anthropic

@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in the harness behaved incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: run `python selfcheck.py`. If it fails, that output
+        alone is usually enough to diagnose the problem.
+
+        **Please scrub anything you paste.** `ledger.jsonl` and `state.json`
+        can contain paths and command output from your workspace.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The smallest set of steps that shows the problem.
+      placeholder: |
+        1. python run.py missions/demo
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: selfcheck
+    attributes:
+      label: selfcheck output
+      description: Output of `python selfcheck.py`.
+      render: shell
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: "`python --version` and `pip freeze | grep langchain`"
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.6 / Ubuntu 24.04
+    validations:
+      required: true
