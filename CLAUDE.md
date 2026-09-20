@@ -30,4 +30,6 @@ The load-bearing rules, in one line each:
 - Tests prove wiring; `evals/` proves behaviour. Quote the held-out corpus
   number, never the one the rules were tuned against.
 - The budget refuses in `wrap_model_call`, before dispatch — not after.
+- The gate stops mistakes, not intent: `run_command` is `shell=True` and
+  unconfined. The container is the boundary — README, "Why the container".
 - Deliberate shortcuts carry a `ponytail:` comment naming the upgrade path.

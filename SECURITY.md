@@ -51,9 +51,20 @@ output. Two places consume it:
   tags whose closing sequence is neutralized, and the grading instruction
   is repeated after the data so a forged one is not the last word. The
   judge also reports `injection_attempted`, which the FinOps report
-  escalates. This is mitigation, not a boundary: treat a verdict from a
-  mission that touched untrusted content as advisory.
-  `python evals/run_online_evals.py --only judge_injection` measures it.
+  escalates. Measured on `claude-sonnet-4-5`, the judge refused all four
+  payloads and flagged every one; run
+  `python evals/run_online_evals.py --only judge_injection --repeat 10`
+  to re-measure, because one sample is not a rate. This is still
+  mitigation, not a boundary — the payloads are ones we thought of — so
+  treat a verdict from a mission that touched untrusted content as
+  advisory.
+
+**The agent has no equivalent defence.** The judge reads tool output to
+grade it; the agent reads tool output to act on it. Nothing fences the
+agent's own context, so an injected instruction reaches the model that
+issues tool calls, and the permission gate is the only thing between that
+instruction and the command it asks for. That is the single strongest
+argument for running missions in the container.
 
 ## Tracing sends workspace content to a third party
 

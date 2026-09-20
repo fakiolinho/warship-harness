@@ -63,7 +63,7 @@ Full list in `.env.example`.
 | `run.py` | mission entrypoint: stream, checkpoint, record outcome |
 | `selfcheck.py` | assert-based smoke test of every component |
 | `seed_ledger.py` | fabricate a ledger so the report has volume to exercise |
-| `Dockerfile` | the real sandbox boundary; `run_command` is not confined without it |
+| `Dockerfile` | the real sandbox boundary; see README "Why the container" |
 | `tests/` | pytest suite, including end-to-end via a scripted model |
 | `evals/` | does it *behave* — gate corpus (offline, in CI) and model evals (opt in) |
 
@@ -129,7 +129,9 @@ to argue for itself explicitly, not slip through.
 9. **The judge's transcript is untrusted input.** It is fenced in tags
    whose closing sequence is neutralized, and the grading instruction is
    repeated after the data. Do not interpolate it raw; do not move the
-   instruction above the data.
+   instruction above the data. Measured on sonnet-4-5: all four payloads
+   refused and flagged. The agent's own context has no such fencing,
+   which is why unattended runs belong in the container.
 
 10. **The test suite never calls a model API.** `tests/conftest.py` has a
    `ScriptedModel` that implements `bind_tools`, which is what lets the

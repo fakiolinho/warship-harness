@@ -154,6 +154,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--only", choices=sorted(EVALS), action="append",
                    help="run just these (repeatable)")
     p.add_argument("--model", default=agent_module.DEFAULT_MODEL)
+    p.add_argument("--repeat", type=int, default=1, metavar="N",
+                   help="run each case N times and report a rate. A single "
+                        "pass is not a pass rate: these are sampled from a "
+                        "stochastic model, and an injection that works one "
+                        "time in ten still works (default: 1)")
     args = p.parse_args(argv)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -162,24 +167,43 @@ def main(argv: list[str] | None = None) -> int:
               "and pytest.", file=sys.stderr)
         return 2
 
-    rows = []
-    for name in (args.only or sorted(EVALS)):
-        print(f"running {name}...", file=sys.stderr)
-        try:
-            rows += EVALS[name](args.model)
-        except Exception as why:            # noqa: BLE001 - report, continue
-            rows.append({"eval": name, "case": "-", "passed": False,
-                         "detail": f"{type(why).__name__}: {why}"})
+    tally: dict[tuple[str, str], list[dict]] = {}
+    for run in range(args.repeat):
+        for name in (args.only or sorted(EVALS)):
+            label = f"{name} ({run + 1}/{args.repeat})" if args.repeat > 1 \
+                else name
+            print(f"running {label}...", file=sys.stderr)
+            try:
+                results = EVALS[name](args.model)
+            except Exception as why:        # noqa: BLE001 - report, continue
+                results = [{"eval": name, "case": "-", "passed": False,
+                            "detail": f"{type(why).__name__}: {why}"}]
+            for r in results:
+                tally.setdefault((r["eval"], r["case"]), []).append(r)
 
     print("\n# Online evals\n")
+    if args.repeat > 1:
+        print(f"Each case sampled {args.repeat} times.\n")
     print("| eval | case | result | detail |")
     print("|---|---|---|---|")
-    for r in rows:
-        print(f"| {r['eval']} | {r['case']} | "
-              f"{'PASS' if r['passed'] else 'FAIL'} | {r['detail']} |")
-    passed = sum(r["passed"] for r in rows)
-    print(f"\n{passed}/{len(rows)} passed.")
-    return 0 if passed == len(rows) else 1
+    total = passed = 0
+    for (name, case), runs in tally.items():
+        hits = sum(r["passed"] for r in runs)
+        total += len(runs)
+        passed += hits
+        if args.repeat > 1:
+            verdict = f"{hits}/{len(runs)}"
+            detail = next((r["detail"] for r in runs if not r["passed"]),
+                          runs[0]["detail"])
+        else:
+            verdict = "PASS" if hits else "FAIL"
+            detail = runs[0]["detail"]
+        print(f"| {name} | {case} | {verdict} | {detail} |")
+    print(f"\n{passed}/{total} passed.")
+    if args.repeat == 1:
+        print("\nSampled once per case. A single pass is not a pass rate; "
+              "use --repeat for one.")
+    return 0 if passed == total else 1
 
 
 if __name__ == "__main__":
