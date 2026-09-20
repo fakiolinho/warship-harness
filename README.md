@@ -248,8 +248,16 @@ WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
 ```
 
 Deterministic from a seed, no model calls, no cost. It refuses to write a
-real ledger: fabricated rows are indistinguishable from real ones the moment
-you look away.
+real ledger, and every fabricated row carries `"synthetic": true`, so the
+report can tell you what it is looking at:
+
+    Every mission here is fabricated by seed_ledger.py.
+    This ledger mixes 15 fabricated missions with 1 real one.
+
+Keep the two apart. Real runs belong in `ledger.jsonl`; seeded data belongs
+in a scratch file you can delete. If you do point a real run at a seeded
+ledger, the report says so on every render rather than quietly averaging
+fiction with fact.
 
 ## Operating cadence
 

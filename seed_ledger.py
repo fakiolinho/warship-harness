@@ -12,9 +12,12 @@ call is involved and none should be. Fabricating plausible numbers is a
 generator's job, not a language model's, and a model would cost money to
 produce data that is fictional either way.
 
-The output is fiction. It goes to its own file and the script refuses to
-write the default ledger, because fabricated rows in a real ledger are
-indistinguishable from real ones the moment you look away.
+The output is fiction, and every row says so: each carries "synthetic":
+true. The script still refuses to write the default ledger, but the marker
+is what makes the honest workflow safe. Point WARSHIP_LEDGER at a seeded
+file and run real missions into it, and finops.py will tell you the report
+is mixing fabricated rows with real ones instead of quietly averaging them
+together.
 """
 import argparse
 import json
@@ -62,6 +65,7 @@ def seed(out: pathlib.Path, n: int, rng: random.Random,
                 "in": fresh + cached + written, "out": rng.randint(40, 400),
                 "cached": cached, "written": written,
                 "cost": round(cost, 6), "ts": ts + c * 7,
+                "synthetic": True,
             })
             stats["spend"] += cost
 
@@ -84,13 +88,14 @@ def seed(out: pathlib.Path, n: int, rng: random.Random,
                 "failed_steps": [] if resolved else [rng.randint(1, 3)],
                 "in": rng.randint(800, 4_000), "out": rng.randint(60, 200),
                 "cached": 0, "cost": round(rng.uniform(0.002, 0.01), 6),
-                "ts": ts + calls * 7 + 1,
+                "ts": ts + calls * 7 + 1, "synthetic": True,
             })
 
         rows.append({
             "kind": "outcome", "mission": mission, "resolved": resolved,
             "steps_done": steps, "interventions": rng.randint(*iv_range),
             "resolved_by": resolved_by, "ts": ts + calls * 7 + 2,
+            "synthetic": True,
         })
         stats["resolved"] += int(resolved)
 

@@ -22,9 +22,11 @@ def analyze(rows: list[dict]) -> dict:
                              "out": 0, "calls": 0, "resolved": None,
                              "steps_done": 0, "interventions": 0,
                              "resolved_by": "steps", "judge_cost": 0.0,
-                             "judge_score": None})
+                             "judge_score": None, "synthetic": False})
     for r in rows:
         s = m[r["mission"]]
+        # One fabricated row makes the whole mission fabricated.
+        s["synthetic"] = s["synthetic"] or bool(r.get("synthetic"))
         if r["kind"] == "call":
             s["cost"] += r["cost"]
             s["in"] += r["in"]
@@ -51,6 +53,7 @@ def analyze(rows: list[dict]) -> dict:
     total_written = sum(s["written"] for s in m.values())
     total_iv = sum(s["interventions"] for s in m.values())
     total_judge = sum(s["judge_cost"] for s in m.values())
+    synthetic = [k for k, s in m.items() if s["synthetic"]]
     judged = [k for k, s in m.items() if s["resolved_by"] == "judge"]
     return {
         "missions": dict(m),
@@ -62,6 +65,7 @@ def analyze(rows: list[dict]) -> dict:
         "cache_written_tokens": total_written,
         "judge_cost": total_judge,
         "judged_missions": len(judged),
+        "synthetic_missions": len(synthetic),
         "interventions_per_mission": total_iv / len(m) if m else 0.0,
     }
 
@@ -88,6 +92,28 @@ def _money(x: float) -> str:
     """No resolved task yet means the ratio is undefined, not infinite.
     Printing $inf in a board deck invites the wrong question."""
     return "n/a (no resolved task yet)" if math.isinf(x) else f"${x:.2f}"
+
+
+def synthetic_note(a: dict) -> str:
+    """Say plainly when the numbers are fiction, or worse, part fiction.
+
+    A report that silently averages fabricated missions with real ones is
+    the one failure mode seeded data can introduce, and it looks exactly
+    like a real report.
+    """
+    fake, total = a["synthetic_missions"], len(a["missions"])
+    if not fake:
+        return ""
+    if fake == total:
+        return ("> **Every mission here is fabricated** by `seed_ledger.py`. "
+                "These numbers are for exercising the report, not for a "
+                "review.")
+    real = total - fake
+    return (f"> **This ledger mixes {fake} fabricated "
+            f"{'mission' if fake == 1 else 'missions'} with {real} real "
+            f"{'one' if real == 1 else 'ones'}.** Every number above "
+            "averages the two together. Seed into a scratch file and keep "
+            "real runs in their own ledger.")
 
 
 def cache_note(a: dict) -> str:
@@ -123,16 +149,17 @@ def render(a: dict) -> str:
         lines.append(f"No missions in the ledger yet ({ledger.path()}). "
                      "Run one with `python run.py missions/demo`.")
         return "\n".join(lines)
-    note = cache_note(a)
-    if note:
-        lines += [note, ""]
+    for note in (synthetic_note(a), cache_note(a)):
+        if note:
+            lines += [note, ""]
     lines += ["| mission | spend | calls | steps | resolved | by | quadrant |",
               "|---|---|---|---|---|---|---|"]
     for k, s in sorted(a["missions"].items()):
+        name = f"{k} *(synthetic)*" if s["synthetic"] else k
         by = s["resolved_by"]
         if by == "judge" and s["judge_score"] is not None:
             by = f"judge {s['judge_score']:.2f}"
-        lines.append(f"| {k} | ${s['cost']:.2f} | {s['calls']} | "
+        lines.append(f"| {name} | ${s['cost']:.2f} | {s['calls']} | "
                      f"{s['steps_done']} | {s['resolved']} | {by} | "
                      f"{quadrant(s)} |")
     if a["judged_missions"]:

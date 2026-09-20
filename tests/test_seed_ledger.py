@@ -94,3 +94,41 @@ def test_it_refuses_the_configured_ledger_too(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         seed_ledger.main(["--out", str(real)])
     assert not real.exists()
+
+
+def test_every_fabricated_row_says_so(tmp_path, monkeypatch):
+    """Without a marker, a seeded row and a real one are identical."""
+    out, _ = _seed(tmp_path)
+    monkeypatch.setenv("WARSHIP_LEDGER", str(out))
+    assert all(r.get("synthetic") is True for r in ledger.read())
+
+
+def test_a_fully_seeded_report_says_it_is_fiction(tmp_path, monkeypatch):
+    out, _ = _seed(tmp_path)
+    monkeypatch.setenv("WARSHIP_LEDGER", str(out))
+    report = finops.render(finops.analyze(ledger.read()))
+    assert "Every mission here is fabricated" in report
+
+
+def test_a_mixed_ledger_is_called_out(tmp_path, monkeypatch):
+    """Silently averaging fiction with real runs is the one failure mode
+    seeded data can introduce, and it looks like a normal report."""
+    out, _ = _seed(tmp_path, n=3)
+    monkeypatch.setenv("WARSHIP_LEDGER", str(out))
+    ledger.record_call("real", "sonnet",
+                       {"input_tokens": 700, "output_tokens": 90}, 0.004)
+    ledger.record_outcome("real", True, 3, 0)
+    a = finops.analyze(ledger.read())
+    assert a["synthetic_missions"] == 3
+    report = finops.render(a)
+    assert "mixes 3 fabricated missions with 1 real one." in report
+    assert "*(synthetic)*" in report
+
+
+def test_a_real_only_ledger_gets_no_synthetic_note(isolated_ledger):
+    ledger.record_call("real", "s", {"input_tokens": 10, "output_tokens": 1}, 0.01)
+    ledger.record_outcome("real", True, 3, 0)
+    a = finops.analyze(ledger.read())
+    assert a["synthetic_missions"] == 0
+    assert finops.synthetic_note(a) == ""
+    assert "*(synthetic)*" not in finops.render(a)
