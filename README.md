@@ -52,7 +52,9 @@ spend $0.0064, cache hit rate 80%, steps 3/3, interventions 0
     run.py               mission entrypoint
     selfcheck.py         assert based check of every component, no API key
     seed_ledger.py       fabricate a ledger so the report has volume to exercise
+    Dockerfile           the real sandbox boundary; run.py's ponytail upgrade
     tests/               pytest suite, incl. end to end with a scripted model
+    evals/               does it behave, as opposed to does it run
 
 Built in middleware carries what we did not rewrite: SummarizationMiddleware
 compacts at 75% context on the cheap tier, ModelCallLimitMiddleware caps runs
@@ -298,13 +300,51 @@ on macOS. It sets `WARSHIP_NONINTERACTIVE=1`, which is how the unattended
 posture gets proven: with no TTY there is nobody to approve an `ask`
 verdict, so the harness declines it rather than blocking forever.
 
+## Evals: does it behave, not does it run
+
+The test suite proves the wiring. It cannot prove that the gate's rules
+match what a model actually tries, that the system prompt reliably elicits
+`STEP n DONE`, or that the judge agrees with a human. Those are claims
+about behaviour and they need measurement.
+
+**Offline, no API key, runs in CI:**
+
+```bash
+python evals/run_gate_eval.py
+```
+
+Scores the gate against a labelled corpus of 44 commands. The number that
+matters is **deny recall**: of the commands that should be blocked, how
+many are. CI enforces a floor, so weakening the rules fails the build
+rather than quietly lowering a number nobody watches.
+
+This eval is why the gate is token aware. Measured against the corpus,
+substring matching scored **30% deny recall** — it missed `rm -r -f`,
+`rm --recursive --force`, `find . -delete`, `shred`, `git reset --hard`,
+piped shells, and every credential read, while blocking honest commands
+like `git log --format='%h rm -rf'`. Parsing the command into the segments
+a shell would run, with the shell's own quoting rules, took it to 100%
+without the false positives.
+
+**Online, needs an API key, not in CI:**
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python evals/run_online_evals.py
+```
+
+Three things only a real model can answer: does an injected instruction in
+tool output flip the judge's verdict, does the judge agree with a human on
+unambiguous cases, and does the system prompt actually produce the STEP
+line the whole checkpoint chain depends on. A few cents per run.
+
 ## Hardening for production
 
 The deliberate simplifications carry `ponytail:` comments in the code, each
 naming its ceiling and upgrade path. Before real workloads:
 
     gate.py      swap the console approver for a real paging channel (Slack, PagerDuty)
-    agent.py     swap subprocess for a container sandbox with a network allowlist
+    agent.py     run in the container (see Dockerfile); run_command is NOT confined
     context.py   swap char count for a tokenizer count if limits get tight
     budget.py    pull live pricing from config if you run multiple models
     finops.py    swap the fixed $1 quadrant line for a percentile split

@@ -44,9 +44,20 @@ def default_model(model_id: str = DEFAULT_MODEL) -> ChatAnthropic:
         model_kwargs={"cache_control": CACHE_CONTROL},
     )
 
-# The workspace root every tool is confined to. run.py sets it per mission.
-# ponytail: a process wide global stands in for a real sandbox boundary.
-# Upgrade path: a container whose filesystem *is* the workspace.
+# The workspace root. run.py sets it per mission.
+#
+# Read this before trusting it. read_file is confined to WORKSPACE;
+# run_command is NOT and cannot be, because `sh -c` can reach anything the
+# user running it can reach. `cat /etc/passwd` succeeds. The confinement
+# below is defence in depth against a model that wanders, not a boundary
+# against one that is being steered, and an asymmetric control is worse
+# than none if it is mistaken for the real thing.
+#
+# The real boundary is the process boundary. See Dockerfile: run the
+# mission in a container whose filesystem IS the workspace, and the
+# asymmetry stops mattering because there is nothing outside to reach.
+#
+# ponytail: a process wide global stands in for a sandbox.
 WORKSPACE = pathlib.Path.cwd()
 
 
@@ -81,8 +92,11 @@ def read_file(path: str) -> str:
 @tool
 def run_command(command: str) -> str:
     """Run a shell command in the mission workspace."""
-    # ponytail: subprocess in cwd stands in for a real sandbox.
-    # Upgrade path: Docker / firejail with a network allowlist.
+    # ponytail: `shell=True` in the workspace cwd stands in for a sandbox.
+    # cwd scopes relative paths; it confines nothing. Absolute paths, pipes,
+    # and interpreters all reach the whole filesystem with this user's
+    # privileges. Upgrade path: the container in Dockerfile, with a network
+    # allowlist.
     try:
         out = subprocess.run(command, shell=True, capture_output=True,
                              text=True, timeout=COMMAND_TIMEOUT_S,

@@ -22,7 +22,8 @@ def analyze(rows: list[dict]) -> dict:
                              "out": 0, "calls": 0, "resolved": None,
                              "steps_done": 0, "interventions": 0,
                              "resolved_by": "steps", "judge_cost": 0.0,
-                             "judge_score": None, "synthetic": False})
+                             "judge_score": None, "synthetic": False,
+                             "injection": False})
     for r in rows:
         s = m[r["mission"]]
         # One fabricated row makes the whole mission fabricated.
@@ -40,6 +41,7 @@ def analyze(rows: list[dict]) -> dict:
             # would inflate cost per resolved task with the cost of asking.
             s["judge_cost"] += r.get("cost", 0.0)
             s["judge_score"] = r.get("score")
+            s["injection"] = s["injection"] or bool(r.get("injection_attempted"))
         else:
             s["resolved"] = r["resolved"]
             s["steps_done"] = r["steps_done"]
@@ -54,6 +56,7 @@ def analyze(rows: list[dict]) -> dict:
     total_iv = sum(s["interventions"] for s in m.values())
     total_judge = sum(s["judge_cost"] for s in m.values())
     synthetic = [k for k, s in m.items() if s["synthetic"]]
+    injected = [k for k, s in m.items() if s["injection"]]
     judged = [k for k, s in m.items() if s["resolved_by"] == "judge"]
     return {
         "missions": dict(m),
@@ -66,6 +69,7 @@ def analyze(rows: list[dict]) -> dict:
         "judge_cost": total_judge,
         "judged_missions": len(judged),
         "synthetic_missions": len(synthetic),
+        "injection_missions": sorted(injected),
         "interventions_per_mission": total_iv / len(m) if m else 0.0,
     }
 
@@ -92,6 +96,22 @@ def _money(x: float) -> str:
     """No resolved task yet means the ratio is undefined, not infinite.
     Printing $inf in a board deck invites the wrong question."""
     return "n/a (no resolved task yet)" if math.isinf(x) else f"${x:.2f}"
+
+
+def injection_note(a: dict) -> str:
+    """An attempt to steer the grader is a security event, not a metric.
+
+    Tool output carries whatever was in the files and commands the agent
+    touched, so this is the signal that something in a workspace tried to
+    talk to the thing auditing it. It belongs at the top of the report.
+    """
+    hit = a.get("injection_missions") or []
+    if not hit:
+        return ""
+    return (f"> **The judge reported an instruction attempt in the "
+            f"transcript of: {', '.join(hit)}.** Something in those "
+            "workspaces tried to steer the grader. Treat those verdicts as "
+            "unreliable and read the transcripts before trusting them.")
 
 
 def synthetic_note(a: dict) -> str:
@@ -149,7 +169,7 @@ def render(a: dict) -> str:
         lines.append(f"No missions in the ledger yet ({ledger.path()}). "
                      "Run one with `python run.py missions/demo`.")
         return "\n".join(lines)
-    for note in (synthetic_note(a), cache_note(a)):
+    for note in (injection_note(a), synthetic_note(a), cache_note(a)):
         if note:
             lines += [note, ""]
     lines += ["| mission | spend | calls | steps | resolved | by | quadrant |",

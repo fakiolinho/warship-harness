@@ -33,6 +33,9 @@ python finops.py                     # task economics report
 
 python seed_ledger.py --out demo_ledger.jsonl --missions 40   # no API key
 WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
+
+python evals/run_gate_eval.py         # offline, in CI, has a ratchet
+python evals/run_online_evals.py      # needs a key, costs a few cents
 ```
 
 Python **3.10+** is required; LangChain 1.x dropped 3.9. macOS system Python
@@ -54,7 +57,9 @@ is 3.9, so always create the venv from an explicit `python3.12`.
 | `run.py` | mission entrypoint: stream, checkpoint, record outcome |
 | `selfcheck.py` | assert-based smoke test of every component |
 | `seed_ledger.py` | fabricate a ledger so the report has volume to exercise |
+| `Dockerfile` | the real sandbox boundary; `run_command` is not confined without it |
 | `tests/` | pytest suite, including end-to-end via a scripted model |
+| `evals/` | does it *behave* — gate corpus (offline, in CI) and model evals (opt in) |
 
 ## Invariants — do not break these
 
@@ -94,7 +99,22 @@ to argue for itself explicitly, not slip through.
    arithmetic over recorded facts and re-running it on the same ledger gives
    the same numbers. A judge called from inside the report would break it.
 
-7. **The test suite never calls a model API.** `tests/conftest.py` has a
+7. **The gate is measured, not asserted.** `evals/run_gate_eval.py`
+   scores it against a labelled corpus and CI enforces a deny-recall
+   floor. Changing the rules moves a number. Add a case to the corpus
+   before arguing the gate is fine.
+
+8. **The budget refuses before dispatch.** `wrap_model_call` is the
+   control; `after_model` only accounts. Moving the check back to
+   `after_model` makes it a meter again — it overshot a $0.01 ceiling by
+   420x before this was fixed.
+
+9. **The judge's transcript is untrusted input.** It is fenced in tags
+   whose closing sequence is neutralized, and the grading instruction is
+   repeated after the data. Do not interpolate it raw; do not move the
+   instruction above the data.
+
+10. **The test suite never calls a model API.** `tests/conftest.py` has a
    `ScriptedModel` that implements `bind_tools`, which is what lets the
    real `create_agent` graph run offline. A test needing `ANTHROPIC_API_KEY`
    cannot run in CI. Write it against the scripted model instead.

@@ -1,0 +1,12 @@
+.venv/
+.git/
+.idea/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+ledger.jsonl
+*_ledger.jsonl
+finops_report.md
+.env

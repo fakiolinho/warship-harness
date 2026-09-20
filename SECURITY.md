@@ -21,14 +21,47 @@ deliberate simplifications, each marked `ponytail:` in the source:
   workspace directory. There is no syscall filter, no network allowlist,
   and no resource limit. A command the gate allows runs with the full
   privileges of the user that started the mission.
-- `harness/gate.py` decides with case-insensitive substring matching. It
-  stops the obvious and the accidental. It is not an adversarial parser:
-  `rm -r -f`, a base64'd payload, or a script written to disk and then run
-  will pass it.
+- `harness/gate.py` parses the command into the segments a shell would run
+  and matches on the program and its flags, which is why `rm -r -f` and
+  `cat x | sh` are caught where substring matching missed them. It is
+  still a policy over one string: anything that hides the program until
+  runtime defeats it — a variable holding the command, a script written to
+  disk and then run, base64 in a heredoc. `python evals/run_gate_eval.py`
+  reports what it currently catches.
 
-`read_file` is confined to the workspace root, and the gate's deny list
-always wins over its ask list. Those are real controls. They are not a
-substitute for the ones below.
+**`read_file` is confined to the workspace; `run_command` is not and
+cannot be.** `sh -c` reaches anything the invoking user reaches, so
+`cat /etc/passwd` succeeds. The confinement is defence in depth against a
+model that wanders, not a boundary against one being steered. Do not read
+it as more than that: an asymmetric control mistaken for a real one is
+worse than no control.
+
+The real boundary is the process boundary. See `Dockerfile`.
+
+## Prompt injection through tool output
+
+Tool output is whatever was in the files and commands the agent touched,
+so a repository can write text into the prompt of anything reading that
+output. Two places consume it:
+
+- **The model itself.** Standard agent exposure; the gate is what stands
+  between an injected instruction and a destructive action.
+- **The LLM judge**, which grades the transcript. An injected verdict
+  would be written to the ledger as fact. The transcript is fenced in
+  tags whose closing sequence is neutralized, and the grading instruction
+  is repeated after the data so a forged one is not the last word. The
+  judge also reports `injection_attempted`, which the FinOps report
+  escalates. This is mitigation, not a boundary: treat a verdict from a
+  mission that touched untrusted content as advisory.
+  `python evals/run_online_evals.py --only judge_injection` measures it.
+
+## Tracing sends workspace content to a third party
+
+`ledger.jsonl` records token counts and costs, never prompt or response
+content. **LangSmith tracing is different.** With `LANGSMITH_TRACING=true`,
+prompts, tool output, and the file contents the agent read are sent to
+LangSmith. That is the point of tracing, and it is fine for your own
+repository; think before pointing it at anything sensitive.
 
 ## Running this safely
 

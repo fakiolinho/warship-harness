@@ -66,6 +66,12 @@ jobs:
       - name: Test suite (no API key, no network)
         run: pytest
 
+      - name: Gate eval (behaviour, not wiring)
+        # The suite proves the gate runs. This proves it catches things,
+        # and the floor ratchets: a change that weakens the rules fails CI
+        # instead of quietly lowering a number nobody is watching.
+        run: python evals/run_gate_eval.py --min-deny-recall 1.0
+
       - name: Mission dry run against a scripted model
         # Proves the real entrypoint works end to end: resume prompt,
         # streaming, checkpointing, ledger outcome, FinOps report.

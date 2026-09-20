@@ -129,3 +129,64 @@ def test_explicit_none_cache_details_are_treated_as_zero():
                  "input_token_details": {"cache_read": None,
                                          "cache_creation": None}})
     assert g.spent == pytest.approx(1000 * IN_RATE)
+
+
+class _Req:
+    """Minimal ModelRequest stand-in: messages plus an optional system."""
+
+    def __init__(self, messages, system_message=None):
+        self.messages = messages
+        self.system_message = system_message
+
+
+def test_the_ceiling_refuses_before_dispatch():
+    """after_model can only report; the call is already billed by then."""
+    from langchain_core.messages import HumanMessage
+    dispatched = []
+    g = BudgetGuard(ceiling_usd=0.0001, mission="m")
+    with pytest.raises(MissionPaused, match="refused before dispatch"):
+        g.wrap_model_call(_Req([HumanMessage(content="x" * 40_000)]),
+                          lambda r: dispatched.append(r))
+    assert dispatched == []
+    assert g.spent == 0.0          # nothing was spent, not merely noticed
+
+
+def test_an_affordable_call_is_dispatched():
+    from langchain_core.messages import HumanMessage
+    g = BudgetGuard(ceiling_usd=100.0, mission="m")
+    assert g.wrap_model_call(_Req([HumanMessage(content="hi")]),
+                             lambda r: "ran") == "ran"
+
+
+def test_a_spent_out_budget_refuses_immediately():
+    from langchain_core.messages import HumanMessage
+    g = BudgetGuard(ceiling_usd=1.00, mission="m")
+    g.spent = 1.00
+    with pytest.raises(MissionPaused, match="already reached"):
+        g.wrap_model_call(_Req([HumanMessage(content="hi")]), lambda r: "ran")
+
+
+def test_the_reserved_output_is_part_of_the_projection():
+    """The unknowable half of a call's cost is its output; reserve it or
+    the ceiling can still be overshot by a long generation."""
+    from langchain_core.messages import HumanMessage
+    req = _Req([HumanMessage(content="hi")])
+    small = BudgetGuard(ceiling_usd=100, max_output_tokens=1_000)
+    large = BudgetGuard(ceiling_usd=100, max_output_tokens=100_000)
+    assert large.projected_cost(req) > small.projected_cost(req)
+
+
+def test_the_system_message_counts_toward_the_projection():
+    from langchain_core.messages import HumanMessage, SystemMessage
+    g = BudgetGuard(ceiling_usd=100)
+    bare = g.projected_cost(_Req([HumanMessage(content="hi")]))
+    withsys = g.projected_cost(
+        _Req([HumanMessage(content="hi")],
+             SystemMessage(content="a long stable system prefix " * 200)))
+    assert withsys > bare
+
+
+def test_a_malformed_request_does_not_crash_the_guard():
+    """An estimate that cannot be computed must not take down a mission."""
+    g = BudgetGuard(ceiling_usd=100)
+    assert g.projected_cost(_Req(None)) >= 0
