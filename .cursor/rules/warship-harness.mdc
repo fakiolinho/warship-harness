@@ -1,0 +1,32 @@
+---
+description: Warship Harness project rules — read AGENTS.md before editing
+alwaysApply: true
+---
+
+Full orientation lives in [AGENTS.md](mdc:AGENTS.md). Read it before
+editing: it has the commands, the layout, the invariants, and the gotchas.
+
+Fast facts:
+
+- Python 3.10+ (LangChain 1.x dropped 3.9). Build the venv from an explicit
+  `python3.12`; macOS system Python is 3.9 and will fail to install deps.
+- Verify with `python selfcheck.py`, `pytest`, and `ruff check .`. All three
+  must pass. None of them need an API key or network access.
+- This is a reference harness of about 750 readable lines, not a framework.
+  Optimize for legibility. Do not add plugin systems or class hierarchies.
+
+Invariants that must not be broken (details in AGENTS.md):
+
+1. The permission gate sits outside the model's code path; deny beats ask.
+2. The cacheable prompt prefix must not drift — volatile text goes last.
+3. Every control can say no; with no TTY an `ask` is declined, not approved.
+4. Memory is human-reviewed: pending → approved. Never auto-promote.
+5. `state.checkpoint()` is idempotent, upserting by step number.
+6. `finops.py` is deterministic Python; no model call in the math.
+7. No test may require an API key — use `ScriptedModel` in tests/conftest.py.
+
+Conventions:
+
+- Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and
+  the upgrade path. Add one when you add a shortcut.
+- Comments explain why, not what. Test names state the property protected.

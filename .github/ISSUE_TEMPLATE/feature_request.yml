@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a change to the harness
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project stays small on purpose: it is a reference harness meant
+        to be read in one sitting, not a framework. Proposals that add a
+        plugin system, a config layer, or a class hierarchy are usually
+        declined. See CONTRIBUTING.md.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What goes wrong today, in a concrete situation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposal
+      description: What you would change, and roughly how.
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Invariants
+      description: >
+        AGENTS.md lists the invariants this project protects. Does your
+        proposal touch any of them? If so, make the case here.

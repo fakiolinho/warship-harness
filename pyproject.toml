@@ -1,0 +1,62 @@
+[project]
+name = "warship-harness"
+version = "0.1.0"
+description = "A minimal, real agent harness on LangChain create_agent: permission gate, bounded context, budget circuit breaker, checkpointed state, reviewed memory, and a task economics ledger."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Marios Fakiolas", email = "fakiolasmarios@gmail.com" }]
+keywords = ["agents", "langchain", "llm", "harness", "finops", "observability"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "langchain>=1.4",
+    "langchain-anthropic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/fakiolinho/warship-harness"
+Issues = "https://github.com/fakiolinho/warship-harness/issues"
+
+[tool.setuptools]
+packages = ["harness"]
+py-modules = ["agent", "run", "finops", "selfcheck"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "E501",    # long lines are caught by review, not by a linter
+    "B008",    # LangChain decorators legitimately call in defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"selfcheck.py" = ["E402"]   # imports after os.environ setup, on purpose
+"tests/*" = ["A002"]

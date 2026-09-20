@@ -1,0 +1,46 @@
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Other editors
+.vscode/
+*.swp
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Harness runtime output (regenerated per run; never commit)
+ledger.jsonl
+finops_report.md
+memory/pending.md
+memory/approved.md
+missions/*/state.json
+missions/*/artifacts/
