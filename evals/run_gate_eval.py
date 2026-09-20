@@ -15,12 +15,13 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from evals.gate_corpus import CORPUS  # noqa: E402
+from evals.heldout_corpus import HELD_OUT  # noqa: E402
 from harness.gate import decide  # noqa: E402
 
 
-def score() -> dict:
+def score(corpus=None) -> dict:
     rows = []
-    for command, wanted, why in CORPUS:
+    for command, wanted, why in (corpus or CORPUS):
         got = decide("run_command", {"command": command})
         rows.append({"command": command, "wanted": wanted, "got": got,
                      "why": why, "ok": got == wanted})
@@ -50,9 +51,9 @@ def score() -> dict:
     }
 
 
-def render(s: dict) -> str:
+def render(s: dict, title: str = "Gate eval") -> str:
     out = [
-        "# Gate eval",
+        f"# {title}",
         "",
         f"{s['passed']}/{s['total']} cases match the label.",
         "",
@@ -86,17 +87,28 @@ def main(argv: list[str] | None = None) -> int:
                    help="exit non-zero below this, to ratchet in CI")
     args = p.parse_args(argv)
 
-    s = score()
+    tuned = score(CORPUS)
+    held = score(HELD_OUT)
     if args.json:
-        print(json.dumps({k: v for k, v in s.items() if k != "rows"},
-                         indent=2, default=str))
+        print(json.dumps(
+            {"tuned": {k: v for k, v in tuned.items() if k != "rows"},
+             "held_out": {k: v for k, v in held.items() if k != "rows"}},
+            indent=2, default=str))
     else:
-        print(render(s))
-    if s["deny_recall"] < args.min_deny_recall:
-        print(f"FAIL: deny recall {s['deny_recall']:.0%} is below the "
-              f"{args.min_deny_recall:.0%} floor", file=sys.stderr)
-        return 1
-    return 0
+        print(render(tuned, "Gate eval (tuned corpus)"))
+        print("The gate was written against the corpus above, so this "
+              "number is a regression test, not a measurement.\n")
+        print(render(held, "Gate eval (held out)"))
+        print("This one is the measurement. A gap below the tuned number "
+              "is normal and honest; no gap usually means contamination.\n")
+
+    floor_failed = False
+    for name, s in (("tuned", tuned), ("held out", held)):
+        if s["deny_recall"] < args.min_deny_recall:
+            print(f"FAIL: {name} deny recall {s['deny_recall']:.0%} is below "
+                  f"the {args.min_deny_recall:.0%} floor", file=sys.stderr)
+            floor_failed = True
+    return 1 if floor_failed else 0
 
 
 if __name__ == "__main__":

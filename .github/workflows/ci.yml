@@ -67,8 +67,10 @@ jobs:
         run: pytest
 
       - name: Gate eval (behaviour, not wiring)
-        # The suite proves the gate runs. This proves it catches things,
-        # and the floor ratchets: a change that weakens the rules fails CI
+        # The suite proves the gate runs. This proves it catches things.
+        # Two corpora are scored: the one the rules were written against
+        # (a regression test) and a held-out one (the measurement). The
+        # floor applies to both, so weakening the rules fails the build
         # instead of quietly lowering a number nobody is watching.
         run: python evals/run_gate_eval.py --min-deny-recall 1.0
 

@@ -87,7 +87,11 @@ def fence(tag: str, content: str) -> str:
     """
     safe = str(content)
     for t in FENCED:
-        safe = re.sub(rf"</\s*{t}\s*>", f"[{t}]", safe, flags=re.IGNORECASE)
+        # Whitespace anywhere inside the tag, and a missing ">", both
+        # still read as a delimiter to a model. Neutralize all of them.
+        safe = re.sub(rf"<\s*/\s*{t}\s*>?", f"[{t}]", safe,
+                      flags=re.IGNORECASE)
+        safe = re.sub(rf"<\s*{t}\s*>", f"[{t}]", safe, flags=re.IGNORECASE)
     return safe
 
 

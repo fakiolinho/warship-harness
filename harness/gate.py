@@ -31,12 +31,37 @@ DENY = ()          # add a literal here to block it outright
 ASK = ("git push", "deploy", "helm ", "kubectl apply", "send_email")
 
 # Programs that execute whatever they are handed.
-INTERPRETERS = {"sh", "bash", "zsh", "ksh", "dash", "python", "python3",
-                "perl", "ruby", "node", "php", "eval", "source"}
+SHELLS = {"sh", "bash", "zsh", "ksh", "dash", "eval", "source"}
+LANGUAGES = {"python", "python3", "perl", "ruby", "node", "php"}
+INTERPRETERS = SHELLS | LANGUAGES
 # Programs whose whole purpose is destruction.
 DESTRUCTIVE = {"mkfs", "shred", "srm", "wipefs"}
 # Programs that move data off the machine.
-EXFIL = {"nc", "ncat", "netcat", "scp", "sftp", "rsync", "ftp", "telnet"}
+EXFIL = {"nc", "ncat", "netcat", "scp", "sftp", "rsync", "ftp", "telnet",
+         "ssh"}
+
+# Programs that run ANOTHER program. Checking only tokens[0] means
+# `nohup rm -rf / &` reads as a call to nohup, which no rule matches.
+# Every one of these is a one word bypass of every rule below.
+WRAPPERS = {"env", "nohup", "timeout", "nice", "ionice", "xargs", "time",
+            "watch", "stdbuf", "setsid", "command", "exec", "builtin",
+            "chroot", "unbuffer"}
+# Flags on a wrapper that consume the next token as their value.
+WRAPPER_VALUE_FLAGS = {"-n", "-I", "-s", "-P", "-L", "-k", "--signal",
+                       "--max-procs", "--replace"}
+
+# Programs that change the filesystem. Paired with the absolute path rule
+# below, this generalises past enumerating every destructive spelling.
+MUTATING = {"rm", "mv", "cp", "chmod", "chown", "chgrp", "ln", "truncate",
+            "tee", "install", "dd", "shred", "mkfs"}
+# Absolute paths a mission may legitimately touch.
+SCRATCH = ("/tmp/", "/var/folders/", "/private/tmp/", "/dev/null")
+
+# Fetching and executing code from a registry is remote code execution
+# with better branding. Gated, not blocked: it is also how work gets done.
+PACKAGE_MANAGERS = {"pip", "pip3", "npm", "pnpm", "yarn", "gem", "cargo",
+                    "go", "composer", "apt", "apt-get", "brew"}
+PACKAGE_INSTALL = {"install", "add", "i", "get"}
 # Programs that fetch and are commonly piped into a shell.
 FETCH = {"curl", "wget"}
 # Paths that are never mission material.
@@ -53,7 +78,11 @@ SQL_DESTRUCTIVE = re.compile(
 # at the program rather than the flag.
 INLINE_DESTRUCTIVE = re.compile(
     r"rmtree|os\.remove|os\.unlink|os\.system|shutil\.move|subprocess"
-    r"|unlink\(|\bexec\(|\beval\(", re.IGNORECASE)
+    r"|unlink\(|\bexec\(|\beval\("
+    # open(path, "w") truncates; so does any write mode.
+    r"|open\s*\([^)]*['\"][wa]"
+    r"|\.write_text\(|\.write_bytes\(|\btruncate\b",
+    re.IGNORECASE)
 # Escalation: whatever follows runs as another user.
 ESCALATE = {"sudo", "doas", "su", "pkexec"}
 # git subcommands that discard work.
@@ -124,7 +153,43 @@ def _flags(args: list[str]) -> set[str]:
     return out
 
 
+def _strip_wrappers(tokens: list[str]) -> list[str]:
+    """Peel off wrapper programs so the real program is judged.
+
+    `timeout 5 rm -rf /` is a call to rm. Reading it as a call to timeout
+    is how a whole class of commands walks past every rule.
+    """
+    i, peeled = 0, 0
+    while i < len(tokens) and peeled < 5:
+        if os.path.basename(tokens[i]).lower() not in WRAPPERS:
+            break
+        exe = os.path.basename(tokens[i]).lower()
+        i += 1
+        peeled += 1
+        while i < len(tokens):
+            tok = tokens[i]
+            if tok.startswith("-"):
+                i += 1
+                if tok in WRAPPER_VALUE_FLAGS and i < len(tokens):
+                    i += 1          # the flag's value
+            elif "=" in tok and not tok.startswith("/"):
+                i += 1              # env VAR=value
+            elif exe == "timeout" and re.fullmatch(r"\d+(\.\d+)?[smhd]?", tok):
+                i += 1              # timeout's duration
+            else:
+                break
+    return tokens[i:]
+
+
+def _outside_scratch(arg: str) -> bool:
+    """An absolute path that is not obviously a scratch location."""
+    return arg.startswith("/") and not arg.startswith(SCRATCH)
+
+
 def _segment_verdict(tokens: list[str], piped_into: bool) -> str | None:
+    if not tokens:
+        return None
+    tokens = _strip_wrappers(tokens)
     if not tokens:
         return None
     segment = " ".join(tokens)
@@ -164,6 +229,28 @@ def _segment_verdict(tokens: list[str], piped_into: bool) -> str | None:
 
     if exe in EXFIL:
         return "deny"
+
+    # A mutating program pointed at an absolute path outside scratch. This
+    # catches `chmod -R 000 /srv` and `mv /srv /dev/null` without needing a
+    # rule per program per spelling.
+    if exe in MUTATING and any(_outside_scratch(a) for a in args):
+        return "deny"
+
+    # A SHELL handed a script file is the write-then-run bypass: the agent
+    # can write the script itself, and this gate cannot see inside it.
+    # Language interpreters are left alone, because `python selfcheck.py`
+    # is ordinary work and gating it would make the gate unusable — which
+    # is its own failure mode, since an obstructive gate gets loosened.
+    if exe in SHELLS and args and not args[0].startswith("-"):
+        return "ask"
+
+    # Any interpreter running a script from outside the workspace.
+    if exe in INTERPRETERS and any(
+            a.startswith("/tmp/") or _outside_scratch(a) for a in args):
+        return "ask"
+
+    if exe in PACKAGE_MANAGERS and any(a in PACKAGE_INSTALL for a in args[:2]):
+        return "ask"
 
     if exe in FETCH:
         return "deny"

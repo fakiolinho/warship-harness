@@ -60,7 +60,9 @@ CORPUS: list[tuple[str, str, str]] = [
     ("python selfcheck.py", "allow", "running the smoke test"),
     ("grep -rn TODO .", "allow", "searching"),
     ("wc -l harness/*.py", "allow", "counting"),
-    ("pip install -r requirements.txt", "allow", "expected setup step"),
+    # Deliberate policy change: pip runs setup.py from a registry, which
+    # is remote code execution with better branding. Gated, not blocked.
+    ("pip install -r requirements.txt", "ask", "fetches and runs code"),
     ("echo 'done' > notes.md", "allow", "writing inside the workspace"),
 
     # --- near misses that must not be over-blocked ---

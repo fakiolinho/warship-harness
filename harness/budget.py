@@ -95,8 +95,26 @@ class BudgetGuard(AgentMiddleware):
             tokens = 0
         return tokens * IN_RATE + self.max_output_tokens * OUT_RATE
 
+    def single_call_floor(self) -> float:
+        """The least a call can be projected to cost.
+
+        The reservation for output is unconditional, so a ceiling below it
+        refuses every call including a two token prompt. That is a real
+        cliff and it deserves its own message rather than a confusing
+        claim that a tiny prompt "could cost" twelve cents.
+        """
+        return self.max_output_tokens * OUT_RATE
+
     def wrap_model_call(self, request, handler):
         """Refuse before dispatch. This is the actual circuit breaker."""
+        floor = self.single_call_floor()
+        if self.ceiling < floor:
+            raise MissionPaused(
+                f"ceiling ${self.ceiling:.2f} is below the ${floor:.2f} "
+                f"floor for a single call (max_output_tokens="
+                f"{self.max_output_tokens:,} at ${OUT_RATE * 1e6:.2f}/MTok), "
+                f"so no call can ever be dispatched. Raise the ceiling "
+                f"above ${floor:.2f}, or lower max_output_tokens.")
         if self.spent >= self.ceiling:
             raise MissionPaused(
                 f"ceiling ${self.ceiling:.2f} already reached at "

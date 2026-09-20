@@ -268,7 +268,15 @@ verdicts and budget pauses. That silence is the point.
 
 Weekly, fifteen minutes: run finops.py, read the four numbers against last
 week, and review `memory/pending.md` before approving it into
-`memory/approved.md`. A falling cache hit rate means someone touched the
+`memory/approved.md`. Nothing writes `pending.md` unless a mission ran
+with `--distill`, so the loop starts there:
+
+```bash
+python run.py missions/demo --distill     # queues memory/pending.md
+# read it, then:
+python -c "from harness import memory; import pathlib; \
+           memory.approve(pathlib.Path('missions/memory'))"
+``` A falling cache hit rate means someone touched the
 stable prefix; a rising interventions count means the gate rules or the
 mission briefs need work; a mission living in VELOCITY THEATRE gets its brief
 rewritten or gets retired.
@@ -318,13 +326,24 @@ matters is **deny recall**: of the commands that should be blocked, how
 many are. CI enforces a floor, so weakening the rules fails the build
 rather than quietly lowering a number nobody watches.
 
-This eval is why the gate is token aware. Measured against the corpus,
-substring matching scored **30% deny recall** — it missed `rm -r -f`,
-`rm --recursive --force`, `find . -delete`, `shred`, `git reset --hard`,
-piped shells, and every credential read, while blocking honest commands
-like `git log --format='%h rm -rf'`. Parsing the command into the segments
-a shell would run, with the shell's own quoting rules, took it to 100%
-without the false positives.
+Two corpora are scored. `gate_corpus.py` is the one the rules were
+written against, which makes it a regression test rather than a
+measurement. `heldout_corpus.py` is kept out of that loop, and its number
+is the one worth quoting.
+
+That distinction was learned the hard way. Substring matching scored
+**30% deny recall** on the tuning corpus; parsing the command into the
+segments a shell would run took it to 100%. On the first fifteen commands
+held out from that corpus, **twelve still walked straight through** — the
+gate only ever inspected the first token, so `env`, `nohup`, `timeout`,
+`nice` and `xargs` were each a one word bypass of every rule. Wrappers are
+now peeled off before judging, and a mutating program aimed at an absolute
+path outside scratch is denied structurally rather than by enumerating
+every destructive spelling.
+
+A gate that obstructs honest work gets loosened, so the rules distinguish
+shells from language interpreters: `sh release.sh` asks (the agent can
+write that script itself), `python selfcheck.py` does not.
 
 **Online, needs an API key, not in CI:**
 

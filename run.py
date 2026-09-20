@@ -10,7 +10,7 @@ import sys
 
 import agent as agent_module
 from agent import build_agent
-from harness import BudgetGuard, MissionPaused, judge, ledger, state
+from harness import BudgetGuard, MissionPaused, judge, ledger, memory, state
 
 STEP_RE = re.compile(r"STEP (\d+) DONE: (.+)")
 BRIEF_STEP_RE = re.compile(r"^\s*(\d+)\.\s+\S", re.MULTILINE)
@@ -25,7 +25,10 @@ def expected_steps(mission_dir: pathlib.Path) -> int:
     """
     brief = (mission_dir / "mission.md").read_text()
     numbers = [int(n) for n in BRIEF_STEP_RE.findall(brief)]
-    return max(numbers) if numbers else 1
+    # Count the numbered steps rather than taking the highest number. A
+    # brief numbered 1. then 5. asks for two things; max() would demand
+    # five and the mission could never be recorded as resolved.
+    return len(numbers) if numbers else 1
 
 
 def grade(mission_dir: pathlib.Path, transcript: list[str],
@@ -55,9 +58,34 @@ def grade(mission_dir: pathlib.Path, transcript: list[str],
     return verdict
 
 
+def remember(mission_dir: pathlib.Path, transcript: list[str],
+             distill_model) -> pathlib.Path | None:
+    """Distill the run into facts and queue them for human review.
+
+    This is the half of the memory loop that was documented but never
+    called: without it `pending.md` is never written, so nothing is ever
+    there to approve and approved.md stays empty forever. Writing to
+    pending is deliberate — memory lands in the system prompt of every
+    later mission, so a human stays between the two.
+    """
+    memory_dir = mission_dir.parent / "memory"
+    try:
+        facts = memory.distill("\n".join(transcript), distill_model)
+    except Exception as why:          # noqa: BLE001 - never lose the outcome
+        print(f"\ndistill unavailable ({type(why).__name__}: {why})")
+        return None
+    path = memory.submit_for_review(str(facts).strip(), memory_dir)
+    print(f"\nqueued for review: {path}")
+    print("  read it, then approve with: python -c \"from harness import "
+          "memory, pathlib; memory.approve(pathlib.Path('"
+          f"{memory_dir}'))\"")
+    return path
+
+
 def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
          model: str | object = agent_module.DEFAULT_MODEL,
-         judge_model: object | None = None) -> int:
+         judge_model: object | None = None,
+         distill_model: object | None = None) -> int:
     if not (mission_dir / "mission.md").is_file():
         sys.exit(f"error: no mission brief at {mission_dir / 'mission.md'}")
 
@@ -96,6 +124,8 @@ def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
                             getattr(judge_model, "model", "unknown"))
             if verdict is not None:
                 resolved, resolved_by = verdict.resolved, "judge"
+        if distill_model is not None and transcript:
+            remember(mission_dir, transcript, distill_model)
         ledger.record_outcome(mission_dir.name, resolved=resolved,
                               steps_done=steps,
                               interventions=gate.interventions,
@@ -126,6 +156,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="grade the finished mission with an LLM judge "
                         "instead of counting STEP lines. Costs one extra "
                         "model call per mission, recorded in the ledger.")
+    p.add_argument("--distill", nargs="?",
+                   const=agent_module.COMPACTION_MODEL, default=None,
+                   metavar="MODEL",
+                   help="distill the run into facts and queue them in "
+                        "memory/pending.md for human review. Without this "
+                        "the memory loop never starts. Uses the cheap tier "
+                        f"by default ({agent_module.COMPACTION_MODEL}).")
     return p.parse_args(argv)
 
 
@@ -133,4 +170,5 @@ if __name__ == "__main__":
     args = parse_args()
     raise SystemExit(main(
         args.mission, args.ceiling, args.model,
-        agent_module.default_model(args.judge) if args.judge else None))
+        agent_module.default_model(args.judge) if args.judge else None,
+        agent_module.default_model(args.distill) if args.distill else None))

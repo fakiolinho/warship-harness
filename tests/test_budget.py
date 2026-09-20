@@ -143,9 +143,11 @@ def test_the_ceiling_refuses_before_dispatch():
     """after_model can only report; the call is already billed by then."""
     from langchain_core.messages import HumanMessage
     dispatched = []
-    g = BudgetGuard(ceiling_usd=0.0001, mission="m")
+    # Above the single-call floor, so this exercises the projection rather
+    # than the "ceiling is structurally too low" branch.
+    g = BudgetGuard(ceiling_usd=0.20, mission="m")
     with pytest.raises(MissionPaused, match="refused before dispatch"):
-        g.wrap_model_call(_Req([HumanMessage(content="x" * 40_000)]),
+        g.wrap_model_call(_Req([HumanMessage(content="x" * 400_000)]),
                           lambda r: dispatched.append(r))
     assert dispatched == []
     assert g.spent == 0.0          # nothing was spent, not merely noticed
@@ -190,3 +192,25 @@ def test_a_malformed_request_does_not_crash_the_guard():
     """An estimate that cannot be computed must not take down a mission."""
     g = BudgetGuard(ceiling_usd=100)
     assert g.projected_cost(_Req(None)) >= 0
+
+
+def test_a_ceiling_below_the_single_call_floor_says_so():
+    """Otherwise a $0.05 ceiling refuses a two token prompt while claiming
+    it "could cost" twelve cents, which is true and useless."""
+    from langchain_core.messages import HumanMessage
+    g = BudgetGuard(ceiling_usd=0.05, max_output_tokens=8_000)
+    with pytest.raises(MissionPaused, match="below the .* floor"):
+        g.wrap_model_call(_Req([HumanMessage(content="hi")]), lambda r: "ran")
+
+
+def test_the_floor_follows_max_output_tokens():
+    assert BudgetGuard(max_output_tokens=1_000).single_call_floor() < \
+        BudgetGuard(max_output_tokens=8_000).single_call_floor()
+
+
+def test_a_small_ceiling_works_once_the_reservation_is_small():
+    """The floor is a consequence of the reservation, not a hard minimum."""
+    from langchain_core.messages import HumanMessage
+    g = BudgetGuard(ceiling_usd=0.05, max_output_tokens=500)
+    assert g.wrap_model_call(_Req([HumanMessage(content="hi")]),
+                             lambda r: "ran") == "ran"

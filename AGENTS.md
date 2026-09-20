@@ -99,15 +99,26 @@ to argue for itself explicitly, not slip through.
    arithmetic over recorded facts and re-running it on the same ledger gives
    the same numbers. A judge called from inside the report would break it.
 
-7. **The gate is measured, not asserted.** `evals/run_gate_eval.py`
-   scores it against a labelled corpus and CI enforces a deny-recall
-   floor. Changing the rules moves a number. Add a case to the corpus
-   before arguing the gate is fine.
+7. **The gate is measured against a corpus it was not tuned on.**
+   `evals/run_gate_eval.py` scores two: `gate_corpus.py` (written
+   alongside the rules, so a regression test) and `heldout_corpus.py`
+   (the measurement). Quoting the tuned number alone is how "100% deny
+   recall" was reported while twelve of fifteen held-out commands walked
+   through. Never add a case to the held-out file because the gate fails
+   it — fix the rule generally, then add the case to the tuned corpus.
+
+   Rules judge the program, not the text: wrappers (`env`, `nohup`,
+   `timeout`, `xargs`) are peeled off first, and a mutating program aimed
+   at an absolute path outside scratch is denied structurally. A gate
+   that blocks honest work gets loosened, so shells and language
+   interpreters are treated differently.
 
 8. **The budget refuses before dispatch.** `wrap_model_call` is the
    control; `after_model` only accounts. Moving the check back to
    `after_model` makes it a meter again — it overshot a $0.01 ceiling by
-   420x before this was fixed.
+   420x before this was fixed. The reservation for output creates a floor
+   (`single_call_floor()`); a ceiling below it can dispatch nothing, and
+   says so explicitly rather than quoting a confusing projection.
 
 9. **The judge's transcript is untrusted input.** It is fenced in tags
    whose closing sequence is neutralized, and the grading instruction is
