@@ -15,6 +15,8 @@ Fast facts:
 - `python seed_ledger.py --out demo_ledger.jsonl --missions 40` fabricates a
   ledger so `finops.py` has volume to exercise. Deterministic, no API key.
   It refuses to write a real ledger.
+- `python evals/run_gate_eval.py` scores the gate against two corpora. Tests
+  prove the harness runs; evals prove it behaves. Quote the held-out number.
 - This is a reference harness of about 1,200 readable lines, not a framework.
   Optimize for legibility. Do not add plugin systems or class hierarchies.
 

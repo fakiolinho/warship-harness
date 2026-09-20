@@ -10,6 +10,7 @@ python selfcheck.py   # fast smoke test, no API key
 pytest                # full suite, no API key, no network
 ruff check .          # lint
 
+python evals/run_gate_eval.py   # does the gate CATCH things (also in CI)
 python seed_ledger.py --out demo_ledger.jsonl --missions 40   # data to look at
 ```
 
@@ -26,4 +27,7 @@ The load-bearing rules, in one line each:
   judge runs at *record* time and writes its verdict to the ledger, so the
   report stays pure arithmetic over recorded facts.
 - No test may require an API key. Use `ScriptedModel` in `tests/conftest.py`.
+- Tests prove wiring; `evals/` proves behaviour. Quote the held-out corpus
+  number, never the one the rules were tuned against.
+- The budget refuses in `wrap_model_call`, before dispatch — not after.
 - Deliberate shortcuts carry a `ponytail:` comment naming the upgrade path.

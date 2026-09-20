@@ -121,6 +121,12 @@ FinOps report.
 Tune the ceiling per workload class with `--ceiling`. Start low. A ceiling
 that never trips is not a control, it is a decoration.
 
+There is a floor, though. The guard refuses a call *before* dispatch, which
+means reserving the output it cannot yet measure: `max_output_tokens` at the
+output rate, about **$0.12** at the defaults. A ceiling below that can never
+dispatch anything, and says so by name rather than quoting a projection.
+Lower `max_output_tokens` if you want a lower ceiling to be meaningful.
+
 ## Monitoring: three layers
 
 **Layer 1, the ledger (always on).** Every model call appends to

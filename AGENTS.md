@@ -28,8 +28,9 @@ ruff check .          # lint
 
 python run.py missions/demo          # a real mission; needs ANTHROPIC_API_KEY
 python run.py missions/demo --ceiling 1.00
-python run.py missions/demo --judge  # grade the transcript, not the STEP count
-python finops.py                     # task economics report
+python run.py missions/demo --judge    # grade the transcript, not STEP lines
+python run.py missions/demo --distill  # queue facts in memory/pending.md
+python finops.py                       # task economics report
 
 python seed_ledger.py --out demo_ledger.jsonl --missions 40   # no API key
 WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
@@ -40,6 +41,11 @@ python evals/run_online_evals.py      # needs a key, costs a few cents
 
 Python **3.10+** is required; LangChain 1.x dropped 3.9. macOS system Python
 is 3.9, so always create the venv from an explicit `python3.12`.
+
+Environment: `ANTHROPIC_API_KEY` for real missions only (nothing else needs
+it), `WARSHIP_LEDGER` to move the ledger, `WARSHIP_NONINTERACTIVE=1` to make
+every gate `ask` resolve to declined — set that for cron, systemd and CI.
+Full list in `.env.example`.
 
 ## Layout
 
@@ -52,7 +58,7 @@ is 3.9, so always create the venv from an explicit `python3.12`.
 | `harness/memory.py` | distill → pending → **human approves** → loaded |
 | `harness/ledger.py` | every model call and mission outcome, as JSONL |
 | `harness/judge.py` | LLM grades a finished mission against its brief (opt in) |
-| `finops.py` | deterministic task economics report from the ledger |
+| `finops.py` | deterministic task economics report; five quadrants, incl. CHEAP MISS |
 | `agent.py` | wires the stack onto `create_agent`, plus two demo tools |
 | `run.py` | mission entrypoint: stream, checkpoint, record outcome |
 | `selfcheck.py` | assert-based smoke test of every component |

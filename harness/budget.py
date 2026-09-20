@@ -43,6 +43,7 @@ class BudgetGuard(AgentMiddleware):
         self.mission = mission
         self.model = model
         self.spent = 0.0
+        self.calls = 0          # zero means the mission never started
         self.cache_read = 0
         self.cache_write = 0
         self.uncached_in = 0
@@ -54,6 +55,7 @@ class BudgetGuard(AgentMiddleware):
         cache reads plus cache writes. Subtracting only the reads would leave
         writes priced as ordinary input, which is 1.25x, not 1x.
         """
+        self.calls += 1
         details = usage.get("input_token_details") or {}
         cached = details.get("cache_read") or 0
         written = details.get("cache_creation") or 0

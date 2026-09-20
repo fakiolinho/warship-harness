@@ -3,6 +3,7 @@
 No API key, no network. These are the tests that would have caught a
 middleware signature drift after a LangChain upgrade.
 """
+import pytest
 from conftest import ScriptedModel, ai, call
 
 import agent as agent_module
@@ -135,3 +136,60 @@ def test_expected_steps_is_read_from_the_brief(mission, tmp_path):
     solo.mkdir()
     (solo / "mission.md").write_text("Just do the thing.\n")
     assert run_module.expected_steps(solo) == 1
+
+
+class _DeadModel(ScriptedModel):
+    """A model that fails the way a missing API key fails."""
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        raise TypeError(
+            "Anthropic authentication failed: no API key or authorization "
+            "credentials were provided. Set the ANTHROPIC_API_KEY ...")
+
+
+def test_a_setup_failure_is_not_recorded_as_a_failed_mission(
+        mission, isolated_ledger, monkeypatch):
+    """A missing API key put a permanent 'resolved: false' row in the
+    ledger, dragging task success rate down forever. Nothing was
+    dispatched, so there is no mission result to record."""
+    monkeypatch.chdir(mission)
+    assert run_module.main(mission, model=_DeadModel(script=[], calls=[])) == 1
+    assert [r for r in ledger.read() if r["kind"] == "outcome"] == []
+
+
+def test_a_setup_failure_explains_itself(mission, isolated_ledger, monkeypatch,
+                                         capsys):
+    monkeypatch.chdir(mission)
+    run_module.main(mission, model=_DeadModel(script=[], calls=[]))
+    out = capsys.readouterr().out
+    assert "never started" in out
+    assert "ANTHROPIC_API_KEY" in out
+    assert "Traceback" not in out
+
+
+def test_a_failure_after_the_mission_started_is_not_swallowed(
+        mission, isolated_ledger, monkeypatch):
+    """Only a mission that never dispatched is a setup problem. A real
+    failure mid run must still surface."""
+    class _FlakyModel(ScriptedModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            if self.calls:
+                raise RuntimeError("upstream exploded mid mission")
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    monkeypatch.chdir(mission)
+    # A tool call, so the graph comes back for a second model call.
+    model = _FlakyModel(
+        script=[ai("STEP 1 DONE: one",
+                   [call("run_command", {"command": "echo hi"})])],
+        calls=[])
+    with pytest.raises(RuntimeError, match="exploded"):
+        run_module.main(mission, model=model)
+
+
+@pytest.mark.parametrize("message,wanted", [
+    ("Anthropic authentication failed: no API key", "ANTHROPIC_API_KEY"),
+    ("rate limit exceeded", "rate limited"),
+])
+def test_diagnose_turns_library_errors_into_advice(message, wanted):
+    assert wanted in run_module._diagnose(RuntimeError(message))

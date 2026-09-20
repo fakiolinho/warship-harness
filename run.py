@@ -12,6 +12,25 @@ import agent as agent_module
 from agent import build_agent
 from harness import BudgetGuard, MissionPaused, judge, ledger, memory, state
 
+
+def _diagnose(why: BaseException) -> str:
+    """Turn a library exception into something a person can act on.
+
+    A thirty line traceback for a missing API key is a bad first run, and
+    the first run is the one that decides whether there is a second.
+    """
+    text = str(why).lower()
+    if "api key" in text or "authentication" in text or "credential" in text:
+        return ("no Anthropic credentials. Set ANTHROPIC_API_KEY, or see "
+                ".env.example. Nothing here needs a key except a real "
+                "mission: try `python tests/dry_run.py` first.")
+    if "not_found" in text or "model" in text and "does not exist" in text:
+        return f"the model id looks wrong ({why})."
+    if "rate" in text and "limit" in text:
+        return "the API rate limited this run. Try again shortly."
+    return f"{type(why).__name__}: {why}"
+
+
 STEP_RE = re.compile(r"STEP (\d+) DONE: (.+)")
 BRIEF_STEP_RE = re.compile(r"^\s*(\d+)\.\s+\S", re.MULTILINE)
 DEFAULT_CEILING_USD = 5.00
@@ -116,24 +135,35 @@ def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
         print(f"\nPAUSED: {why}\nRe-run to resume from the checkpoint.")
     except KeyboardInterrupt:
         print("\nINTERRUPTED. Re-run to resume from the checkpoint.")
+    except Exception as why:          # noqa: BLE001 - classified below
+        if budget.calls:
+            raise                     # a real failure, mid mission
+        # Nothing was ever dispatched, so this is a setup problem, not a
+        # mission that failed. Recording it as an outcome would put a
+        # config error in the reliability headline forever.
+        print(f"\nThe mission never started: {_diagnose(why)}")
+        return 1
     finally:
         steps = len(state.read_steps(mission_dir))
+        started = budget.calls > 0
         resolved, resolved_by = steps >= wanted, "steps"
         if judge_model is not None:
             verdict = grade(mission_dir, transcript, judge_model,
                             getattr(judge_model, "model", "unknown"))
             if verdict is not None:
                 resolved, resolved_by = verdict.resolved, "judge"
-        if distill_model is not None and transcript:
-            remember(mission_dir, transcript, distill_model)
-        ledger.record_outcome(mission_dir.name, resolved=resolved,
-                              steps_done=steps,
-                              interventions=gate.interventions,
-                              resolved_by=resolved_by)
-        print(f"\nspend ${budget.spent:.4f}, "
-              f"cache hit rate {budget.cache_hit_rate():.0%}, "
-              f"steps {steps}/{wanted}, interventions {gate.interventions}")
-        print("run `python finops.py` for the task economics report")
+        if started:
+            if distill_model is not None and transcript:
+                remember(mission_dir, transcript, distill_model)
+            ledger.record_outcome(mission_dir.name, resolved=resolved,
+                                  steps_done=steps,
+                                  interventions=gate.interventions,
+                                  resolved_by=resolved_by)
+            print(f"\nspend ${budget.spent:.4f}, "
+                  f"cache hit rate {budget.cache_hit_rate():.0%}, "
+                  f"steps {steps}/{wanted}, "
+                  f"interventions {gate.interventions}")
+            print("run `python finops.py` for the task economics report")
     return 0
 
 
