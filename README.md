@@ -13,7 +13,7 @@ context, compaction, a step ceiling, checkpointed state with resume, a budget
 circuit breaker, a human reviewed memory loop, and a task economics ledger
 that proves the value in numbers.
 
-It is about 750 lines. You can read all of it in one sitting, and it is meant
+It is about 1,200 lines. You can read all of it in one sitting, and it is meant
 to be copied into your own project rather than installed as a dependency.
 
 ## See it work, without an API key
@@ -46,10 +46,12 @@ spend $0.0064, cache hit rate 80%, steps 3/3, interventions 0
     harness/state.py     checkpoint + resume; crash at step 40 resumes at 40
     harness/memory.py    distill logs -> pending -> human approve -> loaded
     harness/ledger.py    every model call and mission outcome, as JSONL
+    harness/judge.py     LLM grades a finished mission against its own brief
     finops.py            deterministic task economics report from the ledger
     agent.py             wires it all onto create_agent, plus two demo tools
     run.py               mission entrypoint
     selfcheck.py         assert based check of every component, no API key
+    seed_ledger.py       fabricate a ledger so the report has volume to exercise
     tests/               pytest suite, incl. end to end with a scripted model
 
 Built in middleware carries what we did not rewrite: SummarizationMiddleware
@@ -133,10 +135,23 @@ into the four numbers that belong in a weekly review:
     cache hit rate               the dominant cost lever; falling = broken prefix
     interventions per mission    autonomy trendline; should fall as memory compounds
 
-Per mission it also assigns a quadrant: LEAK (spend, nothing shipped),
-CHEAP WIN, VELOCITY, VELOCITY THEATRE (spend and motion, mission not
-resolved). The analyzer is deterministic Python on purpose. Math that goes in
-front of a board should not hallucinate.
+Per mission it also assigns a quadrant on two axes, spend and whether the
+mission resolved:
+
+| missions that recorded steps | resolved | not resolved |
+|---|---|---|
+| **cheap** | CHEAP WIN | CHEAP MISS |
+| **hot** (> $1) | VELOCITY | VELOCITY THEATRE |
+
+A mission that recorded no steps at all is IDLE when cheap and LEAK when
+hot, whatever the verdict says: spend with nothing to show for it.
+
+Both spend levels split on whether the mission resolved. A mission that
+moved and did not finish is not a win at any price: calling a cheap failure
+a CHEAP WIN is how a failing mission stays in the rotation for months.
+
+The analyzer is deterministic Python on purpose. Math that goes in front of
+a board should not hallucinate.
 
 **Layer 3, traces (when debugging).** The stack is standard LangChain, so
 LangSmith tracing works with zero code changes:

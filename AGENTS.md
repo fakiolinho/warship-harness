@@ -13,7 +13,7 @@ it safe and affordable to run unattended. The thesis is `agent = model +
 harness`. The model supplies reasoning. Everything in `harness/` supplies
 the rest.
 
-It is **not** a framework. It is about 750 lines meant to be read in one sitting
+It is **not** a framework. It is about 1,200 lines meant to be read in one sitting
 and copied into other projects. Optimize for legibility, not extensibility.
 
 ## Commands
@@ -28,7 +28,11 @@ ruff check .          # lint
 
 python run.py missions/demo          # a real mission; needs ANTHROPIC_API_KEY
 python run.py missions/demo --ceiling 1.00
+python run.py missions/demo --judge  # grade the transcript, not the STEP count
 python finops.py                     # task economics report
+
+python seed_ledger.py --out demo_ledger.jsonl --missions 40   # no API key
+WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
 ```
 
 Python **3.10+** is required; LangChain 1.x dropped 3.9. macOS system Python
@@ -44,10 +48,12 @@ is 3.9, so always create the venv from an explicit `python3.12`.
 | `harness/state.py` | checkpoint + resume; a crash at step 40 resumes at 40 |
 | `harness/memory.py` | distill → pending → **human approves** → loaded |
 | `harness/ledger.py` | every model call and mission outcome, as JSONL |
+| `harness/judge.py` | LLM grades a finished mission against its brief (opt in) |
 | `finops.py` | deterministic task economics report from the ledger |
 | `agent.py` | wires the stack onto `create_agent`, plus two demo tools |
 | `run.py` | mission entrypoint: stream, checkpoint, record outcome |
 | `selfcheck.py` | assert-based smoke test of every component |
+| `seed_ledger.py` | fabricate a ledger so the report has volume to exercise |
 | `tests/` | pytest suite, including end-to-end via a scripted model |
 
 ## Invariants — do not break these
