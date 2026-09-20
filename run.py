@@ -95,9 +95,9 @@ def remember(mission_dir: pathlib.Path, transcript: list[str],
         return None
     path = memory.submit_for_review(str(facts).strip(), memory_dir)
     print(f"\nqueued for review: {path}")
-    print("  read it, then approve with: python -c \"from harness import "
-          "memory, pathlib; memory.approve(pathlib.Path('"
-          f"{memory_dir}'))\"")
+    print(f"  read it, then approve with:\n"
+          f"    python -c \"import pathlib; from harness import memory; "
+          f"memory.approve(pathlib.Path('{memory_dir}'))\"")
     return path
 
 

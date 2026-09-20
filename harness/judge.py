@@ -75,8 +75,30 @@ resolved is true only if every numbered step genuinely happened.
 """
 
 MAX_TRANSCRIPT_CHARS = 40_000
+# Of the budget, how much to spend on the opening. The rest goes to the
+# end, because that is where a mission fails.
+HEAD_SHARE = 0.35
 MAX_REASONING_CHARS = 600
 FENCED = ("brief", "transcript")
+
+
+def elide(transcript: str, limit: int = MAX_TRANSCRIPT_CHARS) -> str:
+    """Keep both ends of a long transcript, not just the beginning.
+
+    Taking the first N characters grades a mission on its opening. The
+    common shape of agent failure is a run that goes fine for thirty
+    steps and falls over at the end, and that ending was being dropped —
+    so the judge systematically over-reported success on long missions,
+    which are the expensive ones.
+    """
+    if len(transcript) <= limit:
+        return transcript
+    head = int(limit * HEAD_SHARE)
+    tail = limit - head
+    dropped = len(transcript) - limit
+    return (f"{transcript[:head]}\n\n"
+            f"[... {dropped:,} characters elided from the middle ...]\n\n"
+            f"{transcript[-tail:]}")
 
 
 def fence(tag: str, content: str) -> str:
@@ -171,7 +193,7 @@ def judge_mission(brief: str, transcript: str, model,
     """
     prompt = JUDGE_PROMPT.format(
         brief=fence("brief", brief),
-        transcript=fence("transcript", transcript[:MAX_TRANSCRIPT_CHARS]))
+        transcript=fence("transcript", elide(transcript)))
     response = model.invoke(prompt)
     text = getattr(response, "text", None) or response.content
     verdict = _coerce(parse_verdict(str(text)), model_name)

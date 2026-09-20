@@ -125,3 +125,38 @@ def test_the_report_shows_the_judge_score(isolated_ledger):
     report = finops.render(finops.analyze(ledger.read()))
     assert "judge 0.82" in report
     assert "step count proxy" not in report
+
+
+def test_a_long_transcript_keeps_the_ending():
+    """Keeping only the first N chars grades a mission on its opening.
+    Agents fail at the end, and those are the expensive missions."""
+    body = "\n".join(f"[AIMessage] STEP {i} DONE: fine and padded out"
+                     for i in range(1, 1500))
+    elided = judge.elide(body + "\n[ToolMessage] FATAL: nothing deployed")
+    assert "FATAL: nothing deployed" in elided
+    assert "STEP 1 DONE" in elided
+    assert len(elided) < judge.MAX_TRANSCRIPT_CHARS * 1.05
+
+
+def test_a_short_transcript_is_untouched():
+    assert judge.elide("short") == "short"
+
+
+def test_elision_says_what_it_dropped():
+    """Silent truncation is how a judge grades half a mission and says
+    nothing about it."""
+    out = judge.elide("x" * 100_000)
+    assert "elided from the middle" in out
+
+
+def test_the_judge_actually_receives_both_ends():
+    from conftest import ScriptedModel
+    from langchain_core.messages import AIMessage
+    model = ScriptedModel(
+        script=[AIMessage(content=GOOD, usage_metadata={
+            "input_tokens": 10, "output_tokens": 1, "total_tokens": 11})],
+        calls=[])
+    body = ("OPENING-MARKER\n" + "filler line\n" * 20_000 + "CLOSING-MARKER")
+    judge.judge_mission("brief", body, model, "m")
+    sent = str(model.calls[0])
+    assert "OPENING-MARKER" in sent and "CLOSING-MARKER" in sent
