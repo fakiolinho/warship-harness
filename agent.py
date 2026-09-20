@@ -11,6 +11,7 @@ from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     SummarizationMiddleware,
 )
+from langchain_anthropic import ChatAnthropic
 from langchain_core.tools import tool
 
 from harness import BoundedToolOutput, BudgetGuard, PermissionGate, memory
@@ -19,6 +20,29 @@ DEFAULT_MODEL = "anthropic:claude-sonnet-4-5"
 COMPACTION_MODEL = "anthropic:claude-haiku-4-5"   # cheap tier compacts
 RUN_LIMIT = 60
 COMMAND_TIMEOUT_S = 120
+MAX_TOKENS = 8_000
+
+# Anthropic does not cache unless asked. Without a breakpoint the cache hit
+# rate is structurally 0%, however carefully the prefix is ordered, and the
+# headline FinOps number reads like a broken prefix instead of a switch that
+# was never flipped. This puts one breakpoint at the end of the request, so
+# everything before it (system prompt, tools, prior turns) is cacheable.
+#
+# Two caveats worth knowing before reading the number:
+#   * A prefix shorter than the model's minimum silently will not cache.
+#     Sonnet 4.5 needs 1024 tokens; short missions never reach it.
+#   * Writes cost 1.25x and reads 0.1x, so a prefix reused only once is
+#     roughly break even. Caching pays on long missions, not short ones.
+CACHE_CONTROL = {"type": "ephemeral"}   # 5 minute TTL
+
+
+def default_model(model_id: str = DEFAULT_MODEL) -> ChatAnthropic:
+    """The mission model, with prompt caching switched on."""
+    return ChatAnthropic(
+        model=model_id.removeprefix("anthropic:"),
+        max_tokens=MAX_TOKENS,
+        model_kwargs={"cache_control": CACHE_CONTROL},
+    )
 
 # The workspace root every tool is confined to. run.py sets it per mission.
 # ponytail: a process wide global stands in for a real sandbox boundary.
@@ -74,7 +98,12 @@ def build_agent(mission_dir: pathlib.Path, budget: BudgetGuard,
                 approver=None, compaction_model: str | object | None = None):
     """Assemble the agent. `model` and `approver` are injectable so the
     whole stack can be exercised in tests without an API key or a human.
+
+    A model id string is built through default_model() so caching is on by
+    default; pass a model instance to opt out or to inject a fake.
     """
+    if isinstance(model, str):
+        model = default_model(model)
     approved_memory = memory.load(mission_dir.parent / "memory")
     system = (
         "You are a maintenance agent. Work one step at a time. "

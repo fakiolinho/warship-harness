@@ -2,7 +2,13 @@
 import pytest
 
 from harness import MissionPaused
-from harness.budget import CACHED_RATE, IN_RATE, OUT_RATE, BudgetGuard
+from harness.budget import (
+    CACHE_WRITE_RATE,
+    CACHED_RATE,
+    IN_RATE,
+    OUT_RATE,
+    BudgetGuard,
+)
 
 
 def test_cost_is_priced_per_token_class():
@@ -74,3 +80,52 @@ def test_the_paused_call_is_still_recorded(isolated_ledger):
         g.after_model({"messages": [_Msg({"input_tokens": 1_000_000,
                                           "output_tokens": 0})]})
     assert [r for r in ledger.read() if r["kind"] == "call"]
+
+
+def test_cache_writes_are_priced_at_the_write_premium():
+    """input_tokens is the true total, so writes must be subtracted out too.
+    Left in, they bill at 1x when a cache write actually costs 1.25x."""
+    g = BudgetGuard(ceiling_usd=100)
+    g.add_usage({"input_tokens": 2000, "output_tokens": 0,
+                 "input_token_details": {"cache_read": 1000,
+                                         "cache_creation": 500}})
+    expected = 500 * IN_RATE + 1000 * CACHED_RATE + 500 * CACHE_WRITE_RATE
+    assert g.spent == pytest.approx(expected)
+
+
+def test_a_cache_write_costs_more_than_fresh_input():
+    assert CACHE_WRITE_RATE > IN_RATE > CACHED_RATE
+
+
+def test_two_requests_sharing_a_prefix_beat_paying_twice():
+    """The 5 minute TTL break even: write once, read once, versus two
+    uncached calls. If this inverts, caching is a pure loss."""
+    tokens = 10_000
+    cached_path = tokens * CACHE_WRITE_RATE + tokens * CACHED_RATE
+    uncached_path = 2 * tokens * IN_RATE
+    assert cached_path < uncached_path
+
+
+def test_writes_count_against_the_hit_rate():
+    """Writing and never reading is not caching well; the number says so."""
+    g = BudgetGuard(ceiling_usd=100)
+    g.add_usage({"input_tokens": 1000, "output_tokens": 0,
+                 "input_token_details": {"cache_creation": 1000}})
+    assert g.cache_hit_rate() == 0.0
+    assert g.cache_write == 1000
+
+
+def test_usage_with_no_cache_keys_is_unchanged():
+    """The uncached path must keep costing exactly what it did before."""
+    g = BudgetGuard(ceiling_usd=100)
+    g.add_usage({"input_tokens": 1000, "output_tokens": 100})
+    assert g.spent == pytest.approx(1000 * IN_RATE + 100 * OUT_RATE)
+
+
+def test_explicit_none_cache_details_are_treated_as_zero():
+    """Anthropic sends null, not 0, when a call did not touch the cache."""
+    g = BudgetGuard(ceiling_usd=100)
+    g.add_usage({"input_tokens": 1000, "output_tokens": 0,
+                 "input_token_details": {"cache_read": None,
+                                         "cache_creation": None}})
+    assert g.spent == pytest.approx(1000 * IN_RATE)

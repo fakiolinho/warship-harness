@@ -70,3 +70,26 @@ def test_ledger_path_is_redirectable(isolated_ledger):
     ledger.record_outcome("m", True, 1, 0)
     assert isolated_ledger.exists()
     assert ledger.path() == isolated_ledger
+
+
+def test_cache_writes_are_tracked_separately(isolated_ledger):
+    ledger.record_call("m", "sonnet",
+                       {"input_tokens": 2000, "output_tokens": 10,
+                        "input_token_details": {"cache_read": 1000,
+                                                "cache_creation": 500}}, 0.01)
+    ledger.record_outcome("m", True, 1, 0)
+    a = finops.analyze(ledger.read())
+    assert a["missions"]["m"]["written"] == 500
+    assert a["cache_written_tokens"] == 500
+
+
+def test_older_ledger_rows_without_a_written_key_still_parse(isolated_ledger):
+    """The ledger is append only; rows predate the field."""
+    with isolated_ledger.open("a") as f:
+        f.write('{"kind":"call","mission":"old","model":"s","in":100,'
+                '"out":5,"cached":0,"cost":0.001,"ts":1}\n')
+        f.write('{"kind":"outcome","mission":"old","resolved":true,'
+                '"steps_done":1,"interventions":0,"ts":2}\n')
+    a = finops.analyze(ledger.read())
+    assert a["missions"]["old"]["written"] == 0
+    assert a["task_success_rate"] == 1.0

@@ -35,7 +35,10 @@ def record_call(mission: str, model: str, usage: dict, cost_usd: float) -> None:
         "kind": "call", "mission": mission, "model": model,
         "in": usage.get("input_tokens", 0),
         "out": usage.get("output_tokens", 0),
-        "cached": details.get("cache_read", 0),
+        "cached": details.get("cache_read") or 0,
+        # Writes are input you paid 1.25x for. Recorded separately so the
+        # report can tell "not caching" from "caching and never reading".
+        "written": details.get("cache_creation") or 0,
         "cost": round(cost_usd, 6),
     })
 

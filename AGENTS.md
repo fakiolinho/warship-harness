@@ -64,6 +64,9 @@ to argue for itself explicitly, not slip through.
    memory) goes *after* the stable text. Cache hit rate is the dominant
    cost lever; a byte of churn at the front invalidates the whole prefix.
    `tests/test_agent_e2e.py` asserts this — do not "tidy" it away.
+   Ordering alone caches nothing: Anthropic needs a `cache_control`
+   breakpoint, which `agent.default_model()` sets. Both halves are load
+   bearing, and `tests/test_caching.py` guards the breakpoint.
 
 3. **Every control must be able to say no.** The budget ceiling raises
    `MissionPaused`. The gate returns an error `ToolMessage`. With no TTY,

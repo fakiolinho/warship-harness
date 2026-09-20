@@ -148,6 +148,45 @@ Every model call, tool call, and middleware hop becomes an inspectable trace.
 Turn it on when a mission misbehaves; the ledger alone tells you THAT a
 mission is expensive, the trace tells you WHY.
 
+## Prompt caching
+
+Cache hit rate is the dominant cost lever, and it is the one number that
+needs a caveat. Anthropic caches nothing unless a request asks it to, so
+`agent.py` sets a `cache_control` breakpoint on the model:
+
+```python
+ChatAnthropic(model="claude-sonnet-4-5",
+              model_kwargs={"cache_control": {"type": "ephemeral"}})
+```
+
+Everything before the breakpoint is cacheable, which is why the stable
+prefix discipline matters: `state.resume_prompt()` puts mission progress
+*after* the brief, and `build_agent()` puts approved memory *after* the
+system prompt, so the cacheable part stays byte identical.
+
+Two things make a hit rate of 0% normal rather than broken:
+
+**The prompt may be too short.** Below the model's minimum cacheable prefix
+nothing caches, with no error and no warning. Sonnet 4.5 needs 1024 tokens.
+A three step mission often never reaches it.
+
+| Model | Minimum cacheable prefix |
+|---|---|
+| Opus 4.6, Opus 4.5, Haiku 4.5 | 4096 tokens |
+| Opus 4.7 | 2048 tokens |
+| Sonnet 4.5, Sonnet 4.6, Sonnet 5, Opus 4.8 | 1024 tokens |
+| Opus 5, Fable 5 | 512 tokens |
+
+**Caching is not free.** A write costs 1.25x normal input and a read costs
+0.1x, on a 5 minute TTL. Two calls sharing a prefix roughly break even;
+the gain compounds after that. Caching pays on long missions, not short
+ones, and `finops.py` prices writes at the real rate so the report does not
+flatter itself.
+
+The report tells you which kind of zero you have: no writes at all means
+caching is off or the prompt is too short; writes with no reads means the
+prefix is drifting between calls, or they are more than 5 minutes apart.
+
 ## Operating cadence
 
 Daily, nothing. The harness runs missions; the gate pages you only on ask
@@ -222,7 +261,7 @@ Every variable is optional except the API key. See [.env.example](.env.example).
     selfcheck fails            fix before anything else; it needs no key
     pip install fails          you are on Python 3.9; build the venv from python3.12
     mission restarts from 0    the STEP n DONE line is missing from the brief
-    cache hit rate near zero   something volatile crept into the stable prefix
+    cache hit rate near zero   see Prompt caching below; short prompts never cache
     budget trips instantly     ceiling too low for the workload; raise deliberately
     gate blocks everything     your tool arguments match a DENY substring; refine
     mission never resolves     the brief numbers more steps than the agent completes

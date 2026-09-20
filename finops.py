@@ -18,8 +18,8 @@ REPORT_PATH = "finops_report.md"
 
 
 def analyze(rows: list[dict]) -> dict:
-    m = defaultdict(lambda: {"cost": 0.0, "in": 0, "cached": 0, "out": 0,
-                             "calls": 0, "resolved": None,
+    m = defaultdict(lambda: {"cost": 0.0, "in": 0, "cached": 0, "written": 0,
+                             "out": 0, "calls": 0, "resolved": None,
                              "steps_done": 0, "interventions": 0})
     for r in rows:
         s = m[r["mission"]]
@@ -27,6 +27,8 @@ def analyze(rows: list[dict]) -> dict:
             s["cost"] += r["cost"]
             s["in"] += r["in"]
             s["cached"] += r["cached"]
+            # Rows written before cache writes were tracked have no key.
+            s["written"] += r.get("written", 0)
             s["out"] += r["out"]
             s["calls"] += 1
         else:
@@ -38,6 +40,7 @@ def analyze(rows: list[dict]) -> dict:
     resolved = [k for k, s in m.items() if s["resolved"]]
     total_in = sum(s["in"] for s in m.values())
     total_cached = sum(s["cached"] for s in m.values())
+    total_written = sum(s["written"] for s in m.values())
     total_iv = sum(s["interventions"] for s in m.values())
     return {
         "missions": dict(m),
@@ -46,6 +49,7 @@ def analyze(rows: list[dict]) -> dict:
         "cost_per_resolved_task":
             total_cost / len(resolved) if resolved else float("inf"),
         "cache_hit_rate": total_cached / total_in if total_in else 0.0,
+        "cache_written_tokens": total_written,
         "interventions_per_mission": total_iv / len(m) if m else 0.0,
     }
 
@@ -69,6 +73,26 @@ def _money(x: float) -> str:
     return "n/a (no resolved task yet)" if math.isinf(x) else f"${x:.2f}"
 
 
+def cache_note(a: dict) -> str:
+    """Explain a zero cache hit rate instead of leaving it to be misread.
+
+    Zero reads with zero writes means caching was never switched on, which
+    looks identical to a broken prefix in the headline number and is a
+    completely different problem.
+    """
+    if a["cache_hit_rate"] > 0:
+        return ""
+    if a.get("cache_written_tokens", 0) == 0:
+        return ("> **Cache hit rate is 0% because caching is not enabled.** "
+                "Nothing was written to cache, so there was nothing to read. "
+                "See the Prompt caching section of the README. A prompt "
+                "shorter than the model's minimum cacheable prefix also "
+                "silently will not cache.")
+    return ("> **Cache hit rate is 0% but tokens were written to cache.** "
+            "Writes cost 1.25x and are not being read back: the prefix is "
+            "changing between calls, or they are more than 5 minutes apart.")
+
+
 def render(a: dict) -> str:
     lines = ["# FinOps report: task economics", "",
              "| metric | value |", "|---|---|",
@@ -82,6 +106,9 @@ def render(a: dict) -> str:
         lines.append(f"No missions in the ledger yet ({ledger.path()}). "
                      "Run one with `python run.py missions/demo`.")
         return "\n".join(lines)
+    note = cache_note(a)
+    if note:
+        lines += [note, ""]
     lines += ["| mission | spend | calls | steps | resolved | quadrant |",
               "|---|---|---|---|---|---|"]
     for k, s in sorted(a["missions"].items()):
