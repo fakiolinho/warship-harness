@@ -436,11 +436,12 @@ run's own accounting is written inside the container and thrown away with
 it. `-u` runs as you, so files written to those mounts are yours rather
 than the container user's.
 
-**This Dockerfile has never been built.** It was written on a machine with
-no Docker daemon, so the image, the mounts and the permissions above are
-unverified. Every `COPY` source exists and every import it needs is
-included, which is as far as static checking goes. Build it and run
-`python selfcheck.py` inside before relying on it for anything.
+CI builds this image on every push, runs `selfcheck.py` inside it, and
+asserts that the agent user cannot write to `/etc` — the claim the
+container exists to make. What is still unverified is the **bind mount
+and permission setup above**: CI runs the image without host mounts, so
+`-u` and the `data` volume have not been exercised. Expect to adjust
+those for your own host.
 
 Inside a container whose filesystem is the workspace, "outside the
 workspace" holds nothing worth reaching, and the gate goes back to being

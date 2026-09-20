@@ -36,10 +36,10 @@ model that wanders, not a boundary against one being steered. Do not read
 it as more than that: an asymmetric control mistaken for a real one is
 worse than no control.
 
-The real boundary is the process boundary. See `Dockerfile` — but note
-that **it has never been built**: it was written on a machine with no
-Docker daemon. Treat it as a recipe that still needs testing, not as a
-control that is already in place.
+The real boundary is the process boundary. See `Dockerfile`. CI builds it
+on every push and asserts that the agent user cannot write to `/etc`, so
+the image itself is tested; the bind-mount and `-u` setup in the README
+is not, because CI runs it without host mounts.
 
 ## Prompt injection through tool output
 

@@ -5,9 +5,9 @@
 # otherwise, run the mission in a container whose filesystem IS the
 # workspace: then "outside the workspace" holds nothing worth reaching.
 #
-# UNVERIFIED: written on a machine with no Docker daemon, so this image
-# has never been built. Build it and run selfcheck.py inside before
-# relying on it. Every COPY source exists; that is all that was checked.
+# Built and exercised by CI on every push: selfcheck.py runs inside the
+# image, and a step asserts the agent user cannot write to /etc. The
+# mounts below are NOT covered by that, since CI runs without them.
 #
 #   mkdir -p data
 #   docker build -t warship-harness .

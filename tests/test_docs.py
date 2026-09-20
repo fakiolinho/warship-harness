@@ -87,12 +87,22 @@ def test_the_env_vars_the_docs_name_are_the_ones_the_code_reads():
     assert used <= documented, f"undocumented env vars: {used - documented}"
 
 
-def test_the_container_is_flagged_as_unverified_wherever_it_is_recommended():
-    """SECURITY.md pointed at the Dockerfile as 'the real boundary' while
-    it had never been built. A safety claim resting on untested code must
-    say so where it is made."""
+def test_the_container_job_exists_in_ci():
+    """The docs now claim CI builds the image. If that job is removed the
+    claim becomes false silently, which is how the 'never been built'
+    problem started."""
+    ci = (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "docker build -t warship-harness" in ci
+    assert "/etc/passwd" in ci, "the boundary assertion was dropped"
+
+
+def test_the_untested_part_of_the_container_setup_is_still_flagged():
+    """CI runs the image without host mounts, so -u and the data volume
+    are still unexercised. Claiming the whole recipe is verified would be
+    the same overclaim in a new place."""
     for doc in ("README.md", "SECURITY.md", "Dockerfile"):
         text = (ROOT / doc).read_text()
-        if "docker" in text.lower():
-            assert re.search(r"never been built|UNVERIFIED", text), (
-                f"{doc} recommends the container without flagging it")
+        if "docker run" in text:
+            assert re.search(r"not (?:covered|exercised)|is not, because|"
+                             r"still unverified|NOT covered", text), (
+                f"{doc} shows docker run without flagging the untested mounts")
