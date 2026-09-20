@@ -17,7 +17,7 @@ Fast facts:
   It refuses to write a real ledger.
 - `python evals/run_gate_eval.py` scores the gate against two corpora. Tests
   prove the harness runs; evals prove it behaves. Quote the held-out number.
-- This is a reference harness of about 1,200 readable lines, not a framework.
+- This is a reference harness of about 1,800 readable lines, not a framework.
   Optimize for legibility. Do not add plugin systems or class hierarchies.
 
 Invariants that must not be broken (details in AGENTS.md):

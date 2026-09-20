@@ -13,7 +13,7 @@ context, compaction, a step ceiling, checkpointed state with resume, a budget
 circuit breaker, a human reviewed memory loop, and a task economics ledger
 that proves the value in numbers.
 
-It is about 1,200 lines. You can read all of it in one sitting, and it is meant
+It is about 1,800 lines. You can read all of it in one sitting, and it is meant
 to be copied into your own project rather than installed as a dependency.
 
 ## See it work, without an API key
@@ -420,10 +420,27 @@ between an injected instruction and the command it asks for.
 So: the gate stops mistakes, and mistakes are most of what goes wrong. It
 does not stop intent. The boundary is the process boundary.
 
+    mkdir -p data
     docker build -t warship-harness .
-    docker run --rm -e ANTHROPIC_API_KEY -e WARSHIP_NONINTERACTIVE=1 \
+    docker run --rm \
+      -e ANTHROPIC_API_KEY \
+      -e WARSHIP_NONINTERACTIVE=1 \
+      -e WARSHIP_LEDGER=/work/data/ledger.jsonl \
+      -u "$(id -u):$(id -g)" \
       -v "$PWD/missions:/work/missions" \
+      -v "$PWD/data:/work/data" \
       warship-harness python run.py missions/demo
+
+The ledger and the mission directory are mounted from the host, or the
+run's own accounting is written inside the container and thrown away with
+it. `-u` runs as you, so files written to those mounts are yours rather
+than the container user's.
+
+**This Dockerfile has never been built.** It was written on a machine with
+no Docker daemon, so the image, the mounts and the permissions above are
+unverified. Every `COPY` source exists and every import it needs is
+included, which is as far as static checking goes. Build it and run
+`python selfcheck.py` inside before relying on it for anything.
 
 Inside a container whose filesystem is the workspace, "outside the
 workspace" holds nothing worth reaching, and the gate goes back to being

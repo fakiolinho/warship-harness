@@ -13,7 +13,7 @@ it safe and affordable to run unattended. The thesis is `agent = model +
 harness`. The model supplies reasoning. Everything in `harness/` supplies
 the rest.
 
-It is **not** a framework. It is about 1,200 lines meant to be read in one sitting
+It is **not** a framework. It is about 1,800 lines meant to be read in one sitting
 and copied into other projects. Optimize for legibility, not extensibility.
 
 ## Commands

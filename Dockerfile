@@ -5,13 +5,24 @@
 # otherwise, run the mission in a container whose filesystem IS the
 # workspace: then "outside the workspace" holds nothing worth reaching.
 #
+# UNVERIFIED: written on a machine with no Docker daemon, so this image
+# has never been built. Build it and run selfcheck.py inside before
+# relying on it. Every COPY source exists; that is all that was checked.
+#
+#   mkdir -p data
 #   docker build -t warship-harness .
 #   docker run --rm \
 #     -e ANTHROPIC_API_KEY \
 #     -e WARSHIP_NONINTERACTIVE=1 \
+#     -e WARSHIP_LEDGER=/work/data/ledger.jsonl \
+#     -u "$(id -u):$(id -g)" \
 #     -v "$PWD/missions:/work/missions" \
-#     -v "$PWD/ledger.jsonl:/work/ledger.jsonl" \
+#     -v "$PWD/data:/work/data" \
 #     warship-harness python run.py missions/demo
+#
+# Bind mounts belong to the host user, so -u avoids the container user
+# being unable to write to them. Without the data mount the ledger is
+# written inside the container and discarded with it.
 #
 # Network: this image can reach the Anthropic API, which a mission needs.
 # If a mission does not need the wider internet, run it behind an egress

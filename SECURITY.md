@@ -36,7 +36,10 @@ model that wanders, not a boundary against one being steered. Do not read
 it as more than that: an asymmetric control mistaken for a real one is
 worse than no control.
 
-The real boundary is the process boundary. See `Dockerfile`.
+The real boundary is the process boundary. See `Dockerfile` — but note
+that **it has never been built**: it was written on a machine with no
+Docker daemon. Treat it as a recipe that still needs testing, not as a
+control that is already in place.
 
 ## Prompt injection through tool output
 
