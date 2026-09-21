@@ -199,8 +199,9 @@ needs a caveat. Anthropic caches nothing unless a request asks it to, so
 `agent.py` sets a `cache_control` breakpoint on the model:
 
 ```python
-ChatAnthropic(model="claude-sonnet-4-5",
-              model_kwargs={"cache_control": {"type": "ephemeral"}})
+ChatAnthropic(
+    model="claude-sonnet-4-5", model_kwargs={"cache_control": {"type": "ephemeral"}}
+)
 ```
 
 Everything before the breakpoint is cacheable, which is why the stable

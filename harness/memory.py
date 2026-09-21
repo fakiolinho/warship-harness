@@ -2,6 +2,7 @@
 
 Human review sits between pending and approved. Auto-apply is for prototypes.
 """
+
 import pathlib
 
 DISTILL_PROMPT = """Read these mission logs. Extract only durable facts:
@@ -39,7 +40,8 @@ def approve(memory_dir: pathlib.Path) -> pathlib.Path:
     if not pending.exists():
         raise FileNotFoundError(
             f"nothing to approve: {pending} does not exist. "
-            "Run a mission first, or check that it was not already approved.")
+            "Run a mission first, or check that it was not already approved."
+        )
     approved = approved_path(memory_dir)
     old = approved.read_text() if approved.exists() else ""
     approved.write_text(old + "\n" + pending.read_text())

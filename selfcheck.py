@@ -5,6 +5,7 @@ python selfcheck.py  ->  prints OK lines or throws.
 This is the smoke test: fast, dependency free, safe to run anywhere.
 The full suite lives in tests/ and needs pytest.
 """
+
 import os
 import pathlib
 import tempfile
@@ -36,7 +37,7 @@ with tempfile.TemporaryDirectory() as td:
     (mission / "mission.md").write_text("brief")
     state.checkpoint(mission, 1, "listed files", [])
     resumed = state.resume_prompt(mission)
-    assert resumed.startswith("brief")          # stable prefix first
+    assert resumed.startswith("brief")  # stable prefix first
     assert "step 1: listed files" in resumed
 
     # state: re-recording a step replaces it, it does not pile up
@@ -51,8 +52,13 @@ with tempfile.TemporaryDirectory() as td:
 
 # budget: ceiling triggers, cache rate computed
 g = BudgetGuard(ceiling_usd=0.01)
-g.add_usage({"input_tokens": 1000, "output_tokens": 100,
-             "input_token_details": {"cache_read": 900}})
+g.add_usage(
+    {
+        "input_tokens": 1000,
+        "output_tokens": 100,
+        "input_token_details": {"cache_read": 900},
+    }
+)
 assert 0 < g.spent < 0.01 and abs(g.cache_hit_rate() - 0.9) < 1e-9
 g.add_usage({"input_tokens": 4_000_000, "output_tokens": 0})
 assert g.spent > 0.01  # after_model would raise MissionPaused here
@@ -64,11 +70,19 @@ with tempfile.TemporaryDirectory() as td2:
     os.environ["WARSHIP_LEDGER"] = str(pathlib.Path(td2) / "ledger.jsonl")
     import finops as F  # noqa: E402
     from harness import ledger as L  # noqa: E402
-    L.record_call("m1", "sonnet", {"input_tokens": 1000, "output_tokens": 50,
-                  "input_token_details": {"cache_read": 800}}, 0.40)
+
+    L.record_call(
+        "m1",
+        "sonnet",
+        {
+            "input_tokens": 1000,
+            "output_tokens": 50,
+            "input_token_details": {"cache_read": 800},
+        },
+        0.40,
+    )
     L.record_outcome("m1", resolved=True, steps_done=3, interventions=0)
-    L.record_call("m2", "sonnet", {"input_tokens": 500, "output_tokens": 10},
-                  1.60)
+    L.record_call("m2", "sonnet", {"input_tokens": 500, "output_tokens": 10}, 1.60)
     L.record_outcome("m2", resolved=False, steps_done=0, interventions=2)
     a = F.analyze(L.read())
     assert a["task_success_rate"] == 0.5

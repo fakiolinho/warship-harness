@@ -35,10 +35,12 @@ The hook runs the same checks CI runs, so a commit that passes locally
 passes there. It takes a few seconds. `git commit --no-verify` skips it
 when you want to record work in progress.
 
-There is deliberately no `ruff format`. The comments here are wrapped by
-hand so the reasoning lines up with the code it explains, and the
-formatter reflows about 1,800 lines of that. Lint autofix is safe; a
-reformat is not.
+Formatting is handled by `ruff format`, in the hook and in CI. Nobody
+needs to think about wrapping, and no review is ever spent on it. Run
+`ruff format .` if you have edited outside the hook.
+
+Comments are never reflowed by the formatter, only code, so a comment
+that explains a control keeps whatever shape you gave it.
 
 All three must pass before you open a pull request. CI runs exactly these
 on Python 3.10 through 3.13, so a green local run means a green CI run.

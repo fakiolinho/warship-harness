@@ -1,4 +1,5 @@
 """The generator must be reproducible and must not touch a real ledger."""
+
 import random
 
 import pytest
@@ -40,7 +41,7 @@ def test_the_report_renders_from_it(tmp_path, monkeypatch):
     monkeypatch.setenv("WARSHIP_LEDGER", str(out))
     a = finops.analyze(ledger.read())
     assert len(a["missions"]) == 25
-    assert 0 < a["task_success_rate"] < 1       # both outcomes represented
+    assert 0 < a["task_success_rate"] < 1  # both outcomes represented
     assert a["total_cost"] > 0
 
 
@@ -115,8 +116,9 @@ def test_a_mixed_ledger_is_called_out(tmp_path, monkeypatch):
     seeded data can introduce, and it looks like a normal report."""
     out, _ = _seed(tmp_path, n=3)
     monkeypatch.setenv("WARSHIP_LEDGER", str(out))
-    ledger.record_call("real", "sonnet",
-                       {"input_tokens": 700, "output_tokens": 90}, 0.004)
+    ledger.record_call(
+        "real", "sonnet", {"input_tokens": 700, "output_tokens": 90}, 0.004
+    )
     ledger.record_outcome("real", True, 3, 0)
     a = finops.analyze(ledger.read())
     assert a["synthetic_missions"] == 3

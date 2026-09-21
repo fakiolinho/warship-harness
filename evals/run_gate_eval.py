@@ -7,6 +7,7 @@ No API key, no network. The number that matters is DENY RECALL: of the
 commands that should be blocked, how many are. A miss there is a command
 that runs.
 """
+
 import argparse
 import json
 import pathlib
@@ -21,10 +22,17 @@ from harness.gate import decide  # noqa: E402
 
 def score(corpus=None) -> dict:
     rows = []
-    for command, wanted, why in (corpus or CORPUS):
+    for command, wanted, why in corpus or CORPUS:
         got = decide("run_command", {"command": command})
-        rows.append({"command": command, "wanted": wanted, "got": got,
-                     "why": why, "ok": got == wanted})
+        rows.append(
+            {
+                "command": command,
+                "wanted": wanted,
+                "got": got,
+                "why": why,
+                "ok": got == wanted,
+            }
+        )
 
     def recall(label: str) -> tuple[int, int]:
         want = [r for r in rows if r["wanted"] == label]
@@ -65,14 +73,21 @@ def render(s: dict, title: str = "Gate eval") -> str:
         "",
     ]
     if s["escaped"]:
-        out += [f"## {len(s['escaped'])} destructive commands the gate allows",
-                "", "| command | verdict | why it matters |", "|---|---|---|"]
-        out += [f"| `{r['command']}` | {r['got']} | {r['why']} |"
-                for r in s["escaped"]]
+        out += [
+            f"## {len(s['escaped'])} destructive commands the gate allows",
+            "",
+            "| command | verdict | why it matters |",
+            "|---|---|---|",
+        ]
+        out += [f"| `{r['command']}` | {r['got']} | {r['why']} |" for r in s["escaped"]]
         out += [""]
     if s["over_blocked"]:
-        out += [f"## {len(s['over_blocked'])} ordinary commands the gate obstructs",
-                "", "| command | verdict |", "|---|---|"]
+        out += [
+            f"## {len(s['over_blocked'])} ordinary commands the gate obstructs",
+            "",
+            "| command | verdict |",
+            "|---|---|",
+        ]
         out += [f"| `{r['command']}` | {r['got']} |" for r in s["over_blocked"]]
         out += [""]
     if not s["escaped"] and not s["over_blocked"]:
@@ -83,30 +98,47 @@ def render(s: dict, title: str = "Gate eval") -> str:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Score the gate against the corpus.")
     p.add_argument("--json", action="store_true", help="machine readable")
-    p.add_argument("--min-deny-recall", type=float, default=0.0,
-                   help="exit non-zero below this, to ratchet in CI")
+    p.add_argument(
+        "--min-deny-recall",
+        type=float,
+        default=0.0,
+        help="exit non-zero below this, to ratchet in CI",
+    )
     args = p.parse_args(argv)
 
     tuned = score(CORPUS)
     held = score(HELD_OUT)
     if args.json:
-        print(json.dumps(
-            {"tuned": {k: v for k, v in tuned.items() if k != "rows"},
-             "held_out": {k: v for k, v in held.items() if k != "rows"}},
-            indent=2, default=str))
+        print(
+            json.dumps(
+                {
+                    "tuned": {k: v for k, v in tuned.items() if k != "rows"},
+                    "held_out": {k: v for k, v in held.items() if k != "rows"},
+                },
+                indent=2,
+                default=str,
+            )
+        )
     else:
         print(render(tuned, "Gate eval (tuned corpus)"))
-        print("The gate was written against the corpus above, so this "
-              "number is a regression test, not a measurement.\n")
+        print(
+            "The gate was written against the corpus above, so this "
+            "number is a regression test, not a measurement.\n"
+        )
         print(render(held, "Gate eval (held out)"))
-        print("This one is the measurement. A gap below the tuned number "
-              "is normal and honest; no gap usually means contamination.\n")
+        print(
+            "This one is the measurement. A gap below the tuned number "
+            "is normal and honest; no gap usually means contamination.\n"
+        )
 
     floor_failed = False
     for name, s in (("tuned", tuned), ("held out", held)):
         if s["deny_recall"] < args.min_deny_recall:
-            print(f"FAIL: {name} deny recall {s['deny_recall']:.0%} is below "
-                  f"the {args.min_deny_recall:.0%} floor", file=sys.stderr)
+            print(
+                f"FAIL: {name} deny recall {s['deny_recall']:.0%} is below "
+                f"the {args.min_deny_recall:.0%} floor",
+                file=sys.stderr,
+            )
             floor_failed = True
     return 1 if floor_failed else 0
 

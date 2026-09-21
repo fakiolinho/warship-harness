@@ -1,4 +1,5 @@
 """Externalized mission state. A crash at step 40 resumes at step 40."""
+
 import json
 import os
 import pathlib
@@ -9,8 +10,12 @@ def state_path(mission_dir: pathlib.Path) -> pathlib.Path:
     return mission_dir / "state.json"
 
 
-def checkpoint(mission_dir: pathlib.Path, step_no: int, summary: str,
-               artifacts: list[str] | None = None) -> None:
+def checkpoint(
+    mission_dir: pathlib.Path,
+    step_no: int,
+    summary: str,
+    artifacts: list[str] | None = None,
+) -> None:
     """Record step `step_no` as done. Idempotent: re-recording a step
     number overwrites it instead of appending a duplicate.
 
@@ -61,8 +66,12 @@ def resume_prompt(mission_dir: pathlib.Path) -> str:
     if not steps:
         return brief
     done = "\n".join(f"step {s['n']}: {s['done']}" for s in steps)
-    return (brief + "\n\nALREADY COMPLETED, do not redo:\n" + done
-            + "\nContinue from the next step.")
+    return (
+        brief
+        + "\n\nALREADY COMPLETED, do not redo:\n"
+        + done
+        + "\nContinue from the next step."
+    )
 
 
 def read_steps(mission_dir: pathlib.Path) -> list[dict]:

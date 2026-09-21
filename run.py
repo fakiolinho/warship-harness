@@ -3,6 +3,7 @@
 Crashes and budget pauses are cheap: state.json carries progress,
 so the next run resumes instead of restarting.
 """
+
 import argparse
 import pathlib
 import re
@@ -21,9 +22,11 @@ def _diagnose(why: BaseException) -> str:
     """
     text = str(why).lower()
     if "api key" in text or "authentication" in text or "credential" in text:
-        return ("no Anthropic credentials. Set ANTHROPIC_API_KEY, or see "
-                ".env.example. Nothing here needs a key except a real "
-                "mission: try `python tests/dry_run.py` first.")
+        return (
+            "no Anthropic credentials. Set ANTHROPIC_API_KEY, or see "
+            ".env.example. Nothing here needs a key except a real "
+            "mission: try `python tests/dry_run.py` first."
+        )
     if "not_found" in text or "model" in text and "does not exist" in text:
         return f"the model id looks wrong ({why})."
     if "rate" in text and "limit" in text:
@@ -50,8 +53,9 @@ def expected_steps(mission_dir: pathlib.Path) -> int:
     return len(numbers) if numbers else 1
 
 
-def grade(mission_dir: pathlib.Path, transcript: list[str],
-          judge_model, model_name: str) -> judge.Verdict | None:
+def grade(
+    mission_dir: pathlib.Path, transcript: list[str], judge_model, model_name: str
+) -> judge.Verdict | None:
     """Ask the judge whether the mission actually did what the brief asked.
 
     Never fatal. A judge that errors leaves the step count proxy standing,
@@ -60,25 +64,30 @@ def grade(mission_dir: pathlib.Path, transcript: list[str],
     brief = (mission_dir / "mission.md").read_text()
     try:
         verdict, usage = judge.judge_mission(
-            brief, "\n".join(transcript), judge_model, model_name)
-    except Exception as why:          # noqa: BLE001 - never lose the outcome
-        print(f"\njudge unavailable ({type(why).__name__}: {why}); "
-              "falling back to the step count")
+            brief, "\n".join(transcript), judge_model, model_name
+        )
+    except Exception as why:  # noqa: BLE001 - never lose the outcome
+        print(
+            f"\njudge unavailable ({type(why).__name__}: {why}); "
+            "falling back to the step count"
+        )
         return None
     meter = BudgetGuard(ceiling_usd=float("inf"), mission=mission_dir.name)
-    ledger.record_judgement(mission_dir.name, verdict, usage,
-                            meter.add_usage(usage))
+    ledger.record_judgement(mission_dir.name, verdict, usage, meter.add_usage(usage))
     mark = "resolved" if verdict.resolved else "NOT resolved"
-    print(f"\njudge ({verdict.model}, rubric {verdict.rubric}): {mark}, "
-          f"score {verdict.score:.2f}")
+    print(
+        f"\njudge ({verdict.model}, rubric {verdict.rubric}): {mark}, "
+        f"score {verdict.score:.2f}"
+    )
     if verdict.failed_steps:
         print(f"  steps not genuinely completed: {verdict.failed_steps}")
     print(f"  {verdict.reasoning}")
     return verdict
 
 
-def remember(mission_dir: pathlib.Path, transcript: list[str],
-             distill_model) -> pathlib.Path | None:
+def remember(
+    mission_dir: pathlib.Path, transcript: list[str], distill_model
+) -> pathlib.Path | None:
     """Distill the run into facts and queue them for human review.
 
     This is the half of the memory loop that was documented but never
@@ -90,21 +99,26 @@ def remember(mission_dir: pathlib.Path, transcript: list[str],
     memory_dir = mission_dir.parent / "memory"
     try:
         facts = memory.distill("\n".join(transcript), distill_model)
-    except Exception as why:          # noqa: BLE001 - never lose the outcome
+    except Exception as why:  # noqa: BLE001 - never lose the outcome
         print(f"\ndistill unavailable ({type(why).__name__}: {why})")
         return None
     path = memory.submit_for_review(str(facts).strip(), memory_dir)
     print(f"\nqueued for review: {path}")
-    print(f"  read it, then approve with:\n"
-          f"    python -c \"import pathlib; from harness import memory; "
-          f"memory.approve(pathlib.Path('{memory_dir}'))\"")
+    print(
+        f"  read it, then approve with:\n"
+        f'    python -c "import pathlib; from harness import memory; '
+        f"memory.approve(pathlib.Path('{memory_dir}'))\""
+    )
     return path
 
 
-def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
-         model: str | object = agent_module.DEFAULT_MODEL,
-         judge_model: object | None = None,
-         distill_model: object | None = None) -> int:
+def main(
+    mission_dir: pathlib.Path,
+    ceiling_usd: float = DEFAULT_CEILING_USD,
+    model: str | object = agent_module.DEFAULT_MODEL,
+    judge_model: object | None = None,
+    distill_model: object | None = None,
+) -> int:
     if not (mission_dir / "mission.md").is_file():
         sys.exit(f"error: no mission brief at {mission_dir / 'mission.md'}")
 
@@ -116,8 +130,9 @@ def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
     seen: set[str] = set()
     transcript: list[str] = []
     try:
-        for event in agent.stream({"messages": [("user", prompt)]},
-                                  stream_mode="values"):
+        for event in agent.stream(
+            {"messages": [("user", prompt)]}, stream_mode="values"
+        ):
             msg = event["messages"][-1]
             # "values" replays the whole state each superstep, so the same
             # message arrives more than once. Print it once.
@@ -129,15 +144,14 @@ def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
             transcript.append(f"[{type(msg).__name__}] {text}")
             print(text[:400])
             for m in STEP_RE.finditer(text):
-                state.checkpoint(mission_dir, int(m.group(1)),
-                                 m.group(2).strip(), [])
+                state.checkpoint(mission_dir, int(m.group(1)), m.group(2).strip(), [])
     except MissionPaused as why:
         print(f"\nPAUSED: {why}\nRe-run to resume from the checkpoint.")
     except KeyboardInterrupt:
         print("\nINTERRUPTED. Re-run to resume from the checkpoint.")
-    except Exception as why:          # noqa: BLE001 - classified below
+    except Exception as why:  # noqa: BLE001 - classified below
         if budget.calls:
-            raise                     # a real failure, mid mission
+            raise  # a real failure, mid mission
         # Nothing was ever dispatched, so this is a setup problem, not a
         # mission that failed. Recording it as an outcome would put a
         # config error in the reliability headline forever.
@@ -148,57 +162,90 @@ def main(mission_dir: pathlib.Path, ceiling_usd: float = DEFAULT_CEILING_USD,
         started = budget.calls > 0
         resolved, resolved_by = steps >= wanted, "steps"
         if judge_model is not None:
-            verdict = grade(mission_dir, transcript, judge_model,
-                            getattr(judge_model, "model", "unknown"))
+            verdict = grade(
+                mission_dir,
+                transcript,
+                judge_model,
+                getattr(judge_model, "model", "unknown"),
+            )
             if verdict is not None:
                 resolved, resolved_by = verdict.resolved, "judge"
         if started:
             if distill_model is not None and transcript:
                 remember(mission_dir, transcript, distill_model)
-            ledger.record_outcome(mission_dir.name, resolved=resolved,
-                                  steps_done=steps,
-                                  interventions=gate.interventions,
-                                  resolved_by=resolved_by)
-            print(f"\nspend ${budget.spent:.4f}, "
-                  f"cache hit rate {budget.cache_hit_rate():.0%}, "
-                  f"steps {steps}/{wanted}, "
-                  f"interventions {gate.interventions}")
+            ledger.record_outcome(
+                mission_dir.name,
+                resolved=resolved,
+                steps_done=steps,
+                interventions=gate.interventions,
+                resolved_by=resolved_by,
+            )
+            print(
+                f"\nspend ${budget.spent:.4f}, "
+                f"cache hit rate {budget.cache_hit_rate():.0%}, "
+                f"steps {steps}/{wanted}, "
+                f"interventions {gate.interventions}"
+            )
             print("run `python finops.py` for the task economics report")
     return 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        prog="run.py",
-        description="Run a mission through the warship harness.")
-    p.add_argument("mission", nargs="?", default="missions/demo",
-                   type=pathlib.Path,
-                   help="mission directory containing mission.md "
-                        "(default: missions/demo)")
-    p.add_argument("--ceiling", type=float, default=DEFAULT_CEILING_USD,
-                   metavar="USD",
-                   help=f"budget ceiling in USD before the run pauses "
-                        f"(default: {DEFAULT_CEILING_USD:.2f})")
-    p.add_argument("--model", default=agent_module.DEFAULT_MODEL,
-                   help=f"model id (default: {agent_module.DEFAULT_MODEL})")
-    p.add_argument("--judge", nargs="?", const=agent_module.DEFAULT_MODEL,
-                   default=None, metavar="MODEL",
-                   help="grade the finished mission with an LLM judge "
-                        "instead of counting STEP lines. Costs one extra "
-                        "model call per mission, recorded in the ledger.")
-    p.add_argument("--distill", nargs="?",
-                   const=agent_module.COMPACTION_MODEL, default=None,
-                   metavar="MODEL",
-                   help="distill the run into facts and queue them in "
-                        "memory/pending.md for human review. Without this "
-                        "the memory loop never starts. Uses the cheap tier "
-                        f"by default ({agent_module.COMPACTION_MODEL}).")
+        prog="run.py", description="Run a mission through the warship harness."
+    )
+    p.add_argument(
+        "mission",
+        nargs="?",
+        default="missions/demo",
+        type=pathlib.Path,
+        help="mission directory containing mission.md (default: missions/demo)",
+    )
+    p.add_argument(
+        "--ceiling",
+        type=float,
+        default=DEFAULT_CEILING_USD,
+        metavar="USD",
+        help=f"budget ceiling in USD before the run pauses "
+        f"(default: {DEFAULT_CEILING_USD:.2f})",
+    )
+    p.add_argument(
+        "--model",
+        default=agent_module.DEFAULT_MODEL,
+        help=f"model id (default: {agent_module.DEFAULT_MODEL})",
+    )
+    p.add_argument(
+        "--judge",
+        nargs="?",
+        const=agent_module.DEFAULT_MODEL,
+        default=None,
+        metavar="MODEL",
+        help="grade the finished mission with an LLM judge "
+        "instead of counting STEP lines. Costs one extra "
+        "model call per mission, recorded in the ledger.",
+    )
+    p.add_argument(
+        "--distill",
+        nargs="?",
+        const=agent_module.COMPACTION_MODEL,
+        default=None,
+        metavar="MODEL",
+        help="distill the run into facts and queue them in "
+        "memory/pending.md for human review. Without this "
+        "the memory loop never starts. Uses the cheap tier "
+        f"by default ({agent_module.COMPACTION_MODEL}).",
+    )
     return p.parse_args(argv)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    raise SystemExit(main(
-        args.mission, args.ceiling, args.model,
-        agent_module.default_model(args.judge) if args.judge else None,
-        agent_module.default_model(args.distill) if args.distill else None))
+    raise SystemExit(
+        main(
+            args.mission,
+            args.ceiling,
+            args.model,
+            agent_module.default_model(args.judge) if args.judge else None,
+            agent_module.default_model(args.distill) if args.distill else None,
+        )
+    )

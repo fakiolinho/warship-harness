@@ -17,6 +17,7 @@ error rate, it costs money per mission, and a rubric change makes new
 verdicts incomparable to old ones. RUBRIC_VERSION is recorded for exactly
 that reason: when it changes, old verdicts are a different metric.
 """
+
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -96,9 +97,11 @@ def elide(transcript: str, limit: int = MAX_TRANSCRIPT_CHARS) -> str:
     head = int(limit * HEAD_SHARE)
     tail = limit - head
     dropped = len(transcript) - limit
-    return (f"{transcript[:head]}\n\n"
-            f"[... {dropped:,} characters elided from the middle ...]\n\n"
-            f"{transcript[-tail:]}")
+    return (
+        f"{transcript[:head]}\n\n"
+        f"[... {dropped:,} characters elided from the middle ...]\n\n"
+        f"{transcript[-tail:]}"
+    )
 
 
 def fence(tag: str, content: str) -> str:
@@ -111,8 +114,7 @@ def fence(tag: str, content: str) -> str:
     for t in FENCED:
         # Whitespace anywhere inside the tag, and a missing ">", both
         # still read as a delimiter to a model. Neutralize all of them.
-        safe = re.sub(rf"<\s*/\s*{t}\s*>?", f"[{t}]", safe,
-                      flags=re.IGNORECASE)
+        safe = re.sub(rf"<\s*/\s*{t}\s*>?", f"[{t}]", safe, flags=re.IGNORECASE)
         safe = re.sub(rf"<\s*{t}\s*>", f"[{t}]", safe, flags=re.IGNORECASE)
     return safe
 
@@ -151,8 +153,7 @@ def parse_verdict(text: str) -> dict:
         # braces inside string values cannot confuse it the way counting can.
         obj, _ = json.JSONDecoder().raw_decode(text, start)
     except json.JSONDecodeError as e:
-        raise ValueError(
-            f"unparseable JSON in judge response: {text[:200]!r}") from e
+        raise ValueError(f"unparseable JSON in judge response: {text[:200]!r}") from e
     if not isinstance(obj, dict):
         raise ValueError(f"judge returned {type(obj).__name__}, not an object")
     return obj
@@ -183,8 +184,9 @@ def _coerce(raw: dict, model_name: str) -> Verdict:
     )
 
 
-def judge_mission(brief: str, transcript: str, model,
-                  model_name: str = "unknown") -> tuple[Verdict, dict]:
+def judge_mission(
+    brief: str, transcript: str, model, model_name: str = "unknown"
+) -> tuple[Verdict, dict]:
     """Grade one mission. Returns the verdict and the call's usage metadata.
 
     `model` is any LangChain chat model, injected so this is testable with
@@ -192,8 +194,8 @@ def judge_mission(brief: str, transcript: str, model,
     ledger: a harness that measures agent cost should not hide its own.
     """
     prompt = JUDGE_PROMPT.format(
-        brief=fence("brief", brief),
-        transcript=fence("transcript", elide(transcript)))
+        brief=fence("brief", brief), transcript=fence("transcript", elide(transcript))
+    )
     response = model.invoke(prompt)
     text = getattr(response, "text", None) or response.content
     verdict = _coerce(parse_verdict(str(text)), model_name)

@@ -1,4 +1,5 @@
 """Checkpoint and resume: a retry pays for one step, not forty."""
+
 from harness import state
 
 
@@ -61,7 +62,7 @@ def test_concurrent_checkpoints_never_tear_the_file(mission):
         try:
             for i in range(40):
                 state.checkpoint(mission, n * 100 + i, f"step {i}")
-        except Exception as why:        # noqa: BLE001 - recorded, asserted
+        except Exception as why:  # noqa: BLE001 - recorded, asserted
             errors.append(why)
 
     threads = [threading.Thread(target=writer, args=(n,)) for n in range(6)]
@@ -71,8 +72,8 @@ def test_concurrent_checkpoints_never_tear_the_file(mission):
         t.join()
 
     assert errors == []
-    json.loads(state.state_path(mission).read_text())   # never torn
-    assert state.read_steps(mission)                    # and not empty
+    json.loads(state.state_path(mission).read_text())  # never torn
+    assert state.read_steps(mission)  # and not empty
 
 
 def test_no_temp_files_are_left_behind(mission):

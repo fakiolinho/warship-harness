@@ -18,6 +18,7 @@ gate stops mistakes and opportunism. The boundary is the container.
 Measured by `python evals/run_gate_eval.py` against a labelled corpus, so
 changes here move a number instead of a belief.
 """
+
 import os
 import re
 import shlex
@@ -27,7 +28,7 @@ from langchain_core.messages import ToolMessage
 
 # Substring backstop, kept so a rule can be added without writing code.
 # The token rules below are what does the real work.
-DENY = ()          # add a literal here to block it outright
+DENY = ()  # add a literal here to block it outright
 ASK = ("git push", "deploy", "helm ", "kubectl apply", "send_email")
 
 # Programs that execute whatever they are handed.
@@ -37,42 +38,92 @@ INTERPRETERS = SHELLS | LANGUAGES
 # Programs whose whole purpose is destruction.
 DESTRUCTIVE = {"mkfs", "shred", "srm", "wipefs"}
 # Programs that move data off the machine.
-EXFIL = {"nc", "ncat", "netcat", "scp", "sftp", "rsync", "ftp", "telnet",
-         "ssh"}
+EXFIL = {"nc", "ncat", "netcat", "scp", "sftp", "rsync", "ftp", "telnet", "ssh"}
 
 # Programs that run ANOTHER program. Checking only tokens[0] means
 # `nohup rm -rf / &` reads as a call to nohup, which no rule matches.
 # Every one of these is a one word bypass of every rule below.
-WRAPPERS = {"env", "nohup", "timeout", "nice", "ionice", "xargs", "time",
-            "watch", "stdbuf", "setsid", "command", "exec", "builtin",
-            "chroot", "unbuffer"}
+WRAPPERS = {
+    "env",
+    "nohup",
+    "timeout",
+    "nice",
+    "ionice",
+    "xargs",
+    "time",
+    "watch",
+    "stdbuf",
+    "setsid",
+    "command",
+    "exec",
+    "builtin",
+    "chroot",
+    "unbuffer",
+}
 # Flags on a wrapper that consume the next token as their value.
-WRAPPER_VALUE_FLAGS = {"-n", "-I", "-s", "-P", "-L", "-k", "--signal",
-                       "--max-procs", "--replace"}
+WRAPPER_VALUE_FLAGS = {
+    "-n",
+    "-I",
+    "-s",
+    "-P",
+    "-L",
+    "-k",
+    "--signal",
+    "--max-procs",
+    "--replace",
+}
 
 # Programs that change the filesystem. Paired with the absolute path rule
 # below, this generalises past enumerating every destructive spelling.
-MUTATING = {"rm", "mv", "cp", "chmod", "chown", "chgrp", "ln", "truncate",
-            "tee", "install", "dd", "shred", "mkfs"}
+MUTATING = {
+    "rm",
+    "mv",
+    "cp",
+    "chmod",
+    "chown",
+    "chgrp",
+    "ln",
+    "truncate",
+    "tee",
+    "install",
+    "dd",
+    "shred",
+    "mkfs",
+}
 # Absolute paths a mission may legitimately touch.
 SCRATCH = ("/tmp/", "/var/folders/", "/private/tmp/", "/dev/null")
 
 # Fetching and executing code from a registry is remote code execution
 # with better branding. Gated, not blocked: it is also how work gets done.
-PACKAGE_MANAGERS = {"pip", "pip3", "npm", "pnpm", "yarn", "gem", "cargo",
-                    "go", "composer", "apt", "apt-get", "brew"}
+PACKAGE_MANAGERS = {
+    "pip",
+    "pip3",
+    "npm",
+    "pnpm",
+    "yarn",
+    "gem",
+    "cargo",
+    "go",
+    "composer",
+    "apt",
+    "apt-get",
+    "brew",
+}
 PACKAGE_INSTALL = {"install", "add", "i", "get"}
 # Programs that fetch and are commonly piped into a shell.
 FETCH = {"curl", "wget"}
 # Paths that are never mission material.
 SECRETS = re.compile(
     r"(\.ssh/|id_rsa|id_ed25519|\.aws/credentials|\.kube/config"
-    r"|\.netrc|\.npmrc|/etc/shadow|\.env$|\.env\b)", re.IGNORECASE)
+    r"|\.netrc|\.npmrc|/etc/shadow|\.env$|\.env\b)",
+    re.IGNORECASE,
+)
 # Writing here changes the machine, not the workspace.
 SYSTEM_PATHS = re.compile(r"^/(etc|usr|bin|sbin|boot|sys|proc|dev|var/lib)/")
 # Statements that destroy data rather than files.
 SQL_DESTRUCTIVE = re.compile(
-    r"^\s*(drop|truncate)\s+(table|database|schema)\b", re.IGNORECASE)
+    r"^\s*(drop|truncate)\s+(table|database|schema)\b", re.IGNORECASE
+)
 # An inline program is only dangerous for what it does. Denying every
 # `python -c` would block a great deal of honest work, so the rule looks
 # at the program rather than the flag.
@@ -82,7 +133,8 @@ INLINE_DESTRUCTIVE = re.compile(
     # open(path, "w") truncates; so does any write mode.
     r"|open\s*\([^)]*['\"][wa]"
     r"|\.write_text\(|\.write_bytes\(|\btruncate\b",
-    re.IGNORECASE)
+    re.IGNORECASE,
+)
 # Escalation: whatever follows runs as another user.
 ESCALATE = {"sudo", "doas", "su", "pkexec"}
 # git subcommands that discard work.
@@ -108,7 +160,7 @@ def _lex(command: str) -> list[str]:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
         return list(lexer)
-    except ValueError:              # unbalanced quotes: crude but not silent
+    except ValueError:  # unbalanced quotes: crude but not silent
         return command.split()
 
 
@@ -171,11 +223,11 @@ def _strip_wrappers(tokens: list[str]) -> list[str]:
             if tok.startswith("-"):
                 i += 1
                 if tok in WRAPPER_VALUE_FLAGS and i < len(tokens):
-                    i += 1          # the flag's value
+                    i += 1  # the flag's value
             elif "=" in tok and not tok.startswith("/"):
-                i += 1              # env VAR=value
+                i += 1  # env VAR=value
             elif exe == "timeout" and re.fullmatch(r"\d+(\.\d+)?[smhd]?", tok):
-                i += 1              # timeout's duration
+                i += 1  # timeout's duration
             else:
                 break
     return tokens[i:]
@@ -207,8 +259,11 @@ def _segment_verdict(tokens: list[str], piped_into: bool) -> str | None:
 
     # A redirect that writes outside the workspace into system state.
     for i, tok in enumerate(tokens):
-        if (tok in (">", ">>") and i + 1 < len(tokens)
-                and SYSTEM_PATHS.match(tokens[i + 1])):
+        if (
+            tok in (">", ">>")
+            and i + 1 < len(tokens)
+            and SYSTEM_PATHS.match(tokens[i + 1])
+        ):
             return "deny"
 
     # Anything reading a private key or credential file.
@@ -246,7 +301,8 @@ def _segment_verdict(tokens: list[str], piped_into: bool) -> str | None:
 
     # Any interpreter running a script from outside the workspace.
     if exe in INTERPRETERS and any(
-            a.startswith("/tmp/") or _outside_scratch(a) for a in args):
+        a.startswith("/tmp/") or _outside_scratch(a) for a in args
+    ):
         return "ask"
 
     if exe in PACKAGE_MANAGERS and any(a in PACKAGE_INSTALL for a in args[:2]):
@@ -279,8 +335,16 @@ def _segment_verdict(tokens: list[str], piped_into: bool) -> str | None:
             return "ask"
 
     if exe in ("kubectl", "helm", "terraform", "npm", "gh", "docker"):
-        mutating = {"apply", "upgrade", "install", "publish", "merge",
-                    "destroy", "delete", "push"}
+        mutating = {
+            "apply",
+            "upgrade",
+            "install",
+            "publish",
+            "merge",
+            "destroy",
+            "delete",
+            "push",
+        }
         if any(a in mutating for a in args):
             return "ask"
 
@@ -328,7 +392,7 @@ class PermissionGate(AgentMiddleware):
         """approver: callable(tool_name, tool_args) -> bool. Defaults to a
         console prompt; tests and unattended runs inject their own."""
         super().__init__()
-        self.interventions = 0   # human touches, feeds the ledger outcome
+        self.interventions = 0  # human touches, feeds the ledger outcome
         self.approver = approver or _console_approver
 
     def wrap_tool_call(self, request, handler):
@@ -367,6 +431,7 @@ def _console_approver(tool_name: str, tool_args: dict) -> bool:
 
 def _stdin_is_tty() -> bool:
     import sys
+
     try:
         return sys.stdin.isatty()
     except (AttributeError, ValueError):

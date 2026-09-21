@@ -1,4 +1,5 @@
 """The memory loop: a human sits between pending and approved."""
+
 import pytest
 
 from harness import memory
@@ -11,7 +12,7 @@ def test_nothing_approved_means_nothing_loaded(tmp_path):
 def test_pending_is_not_loaded_until_approved(tmp_path):
     mem = tmp_path / "memory"
     memory.submit_for_review("- ci is flaky", mem)
-    assert memory.load(mem) == ""        # the whole point of the gate
+    assert memory.load(mem) == ""  # the whole point of the gate
     memory.approve(mem)
     assert "ci is flaky" in memory.load(mem)
 
@@ -51,6 +52,7 @@ def test_distill_uses_the_injected_model(tmp_path):
         def invoke(self, prompt):
             self.prompt = prompt
             return type("R", (), {"content": "- distilled fact"})()
+
     m = FakeModel()
     assert memory.distill("some logs", m) == "- distilled fact"
     assert "some logs" in m.prompt

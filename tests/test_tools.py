@@ -1,4 +1,5 @@
 """The two demo tools. The brief says "stay in the workspace"; these enforce it."""
+
 import agent as agent_module
 from agent import read_file, run_command
 
@@ -23,8 +24,9 @@ def test_refuses_a_path_outside_the_workspace(tmp_path):
 def test_refuses_traversal_out_of_the_workspace(tmp_path):
     agent_module.set_workspace(tmp_path / "work")
     (tmp_path / "work").mkdir()
-    assert read_file.invoke(
-        {"path": str(tmp_path / "work" / ".." / "etc")}).startswith("BLOCKED")
+    assert read_file.invoke({"path": str(tmp_path / "work" / ".." / "etc")}).startswith(
+        "BLOCKED"
+    )
 
 
 def test_a_missing_file_is_an_error_string_not_a_crash(tmp_path):
@@ -49,8 +51,7 @@ def test_silent_success_still_reports_something(tmp_path):
     assert "exit 0" in run_command.invoke({"command": "true"})
 
 
-def test_a_hung_command_costs_one_tool_call_not_the_mission(tmp_path,
-                                                            monkeypatch):
+def test_a_hung_command_costs_one_tool_call_not_the_mission(tmp_path, monkeypatch):
     agent_module.set_workspace(tmp_path)
     monkeypatch.setattr(agent_module, "COMMAND_TIMEOUT_S", 1)
     out = run_command.invoke({"command": "sleep 5"})

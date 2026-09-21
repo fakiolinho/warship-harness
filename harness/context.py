@@ -1,12 +1,14 @@
 """Bounded tool output: cap what enters the context, persist the rest to disk."""
+
 import hashlib
 import pathlib
 
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import ToolMessage
 
-MAX_INLINE_CHARS = 8_000  # ~2K tokens. ponytail: chars, not tokens; a real
-                          # tokenizer count is the upgrade if limits get tight.
+# Roughly 2K tokens. ponytail: characters, not tokens. Upgrade path: a
+# real tokenizer count, if context limits ever get tight.
+MAX_INLINE_CHARS = 8_000
 
 
 def bounded(text: str, artifact_dir: pathlib.Path) -> str:
@@ -17,8 +19,10 @@ def bounded(text: str, artifact_dir: pathlib.Path) -> str:
     name = hashlib.sha1(text.encode()).hexdigest()[:12] + ".txt"
     path = artifact_dir / name
     path.write_text(text)
-    return (f"[output was {len(text)} chars; full text saved to {path}]\n"
-            f"First lines:\n{text[:800]}")
+    return (
+        f"[output was {len(text)} chars; full text saved to {path}]\n"
+        f"First lines:\n{text[:800]}"
+    )
 
 
 class BoundedToolOutput(AgentMiddleware):

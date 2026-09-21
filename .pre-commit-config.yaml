@@ -3,10 +3,10 @@
 #     pip install -r requirements-dev.txt
 #     pre-commit install
 #
-# Deliberately no `ruff format`. This codebase wraps its comments by hand
-# so the reasoning lines up with the code it explains, and the formatter
-# reflows about 1,800 lines of that. Lint autofix is safe; reformatting is
-# not, and the layout is part of how the repo is meant to be read.
+# `ruff format` runs here too. Formatting is not worth anyone's judgement:
+# a deterministic layout means no contributor has to guess the house style
+# and no review is ever spent on wrapping. Comments are never reflowed by
+# it, only code.
 #
 # The whole thing takes a few seconds. `git commit --no-verify` skips it
 # when you need to record work in progress.
@@ -32,9 +32,16 @@ repos:
   # separate versions here is how a hook and its CI job drift apart.
   - repo: local
     hooks:
-      - id: ruff
+      - id: ruff-check
         name: ruff (lint, with autofix)
         entry: ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: ruff format --force-exclude
         language: system
         types_or: [python, pyi]
         require_serial: true

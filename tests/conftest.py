@@ -4,6 +4,7 @@ The point of the scripted model: the whole harness (gate, bounded output,
 budget, checkpointing, ledger) can be exercised end to end with no API key
 and no network, so CI proves the wiring on every push.
 """
+
 import pathlib
 import sys
 
@@ -14,8 +15,12 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-USAGE = {"input_tokens": 1000, "output_tokens": 50, "total_tokens": 1050,
-         "input_token_details": {"cache_read": 800}}
+USAGE = {
+    "input_tokens": 1000,
+    "output_tokens": 50,
+    "total_tokens": 1050,
+    "input_token_details": {"cache_read": 800},
+}
 
 
 class ScriptedModel(BaseChatModel):
@@ -43,8 +48,7 @@ class ScriptedModel(BaseChatModel):
 
 
 def ai(content: str, tool_calls=None, usage=USAGE) -> AIMessage:
-    return AIMessage(content=content, tool_calls=tool_calls or [],
-                     usage_metadata=usage)
+    return AIMessage(content=content, tool_calls=tool_calls or [], usage_metadata=usage)
 
 
 def call(name: str, args: dict, id: str = "c1") -> dict:
@@ -69,5 +73,6 @@ def mission(tmp_path):
         "1. First thing.\n"
         "2. Second thing.\n"
         "3. Third thing.\n\n"
-        "State STEP <n> DONE: <summary> after each step.\n")
+        "State STEP <n> DONE: <summary> after each step.\n"
+    )
     return d

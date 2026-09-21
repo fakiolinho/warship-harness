@@ -1,4 +1,5 @@
 """Budget circuit breaker: a cost ceiling per mission that pauses instead of burning."""
+
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages.utils import count_tokens_approximately
 
@@ -35,15 +36,20 @@ class BudgetGuard(AgentMiddleware):
     output at the output rate and refuses if the reservation does not fit.
     """
 
-    def __init__(self, ceiling_usd: float = 5.00, mission: str = "adhoc",
-                 model: str = "sonnet", max_output_tokens: int = 8_000):
+    def __init__(
+        self,
+        ceiling_usd: float = 5.00,
+        mission: str = "adhoc",
+        model: str = "sonnet",
+        max_output_tokens: int = 8_000,
+    ):
         super().__init__()
         self.ceiling = ceiling_usd
         self.max_output_tokens = max_output_tokens
         self.mission = mission
         self.model = model
         self.spent = 0.0
-        self.calls = 0          # zero means the mission never started
+        self.calls = 0  # zero means the mission never started
         self.cache_read = 0
         self.cache_write = 0
         self.uncached_in = 0
@@ -63,10 +69,12 @@ class BudgetGuard(AgentMiddleware):
         self.cache_read += cached
         self.cache_write += written
         self.uncached_in += fresh
-        self.spent += (fresh * IN_RATE
-                       + cached * CACHED_RATE
-                       + written * CACHE_WRITE_RATE
-                       + usage.get("output_tokens", 0) * OUT_RATE)
+        self.spent += (
+            fresh * IN_RATE
+            + cached * CACHED_RATE
+            + written * CACHE_WRITE_RATE
+            + usage.get("output_tokens", 0) * OUT_RATE
+        )
         return self.spent
 
     def cache_hit_rate(self) -> float:
@@ -116,17 +124,20 @@ class BudgetGuard(AgentMiddleware):
                 f"floor for a single call (max_output_tokens="
                 f"{self.max_output_tokens:,} at ${OUT_RATE * 1e6:.2f}/MTok), "
                 f"so no call can ever be dispatched. Raise the ceiling "
-                f"above ${floor:.2f}, or lower max_output_tokens.")
+                f"above ${floor:.2f}, or lower max_output_tokens."
+            )
         if self.spent >= self.ceiling:
             raise MissionPaused(
                 f"ceiling ${self.ceiling:.2f} already reached at "
-                f"${self.spent:.2f}; refusing to dispatch another call")
+                f"${self.spent:.2f}; refusing to dispatch another call"
+            )
         projected = self.projected_cost(request)
         if self.spent + projected > self.ceiling:
             raise MissionPaused(
                 f"next call could cost ${projected:.4f}, which would take "
                 f"${self.spent:.4f} past the ${self.ceiling:.2f} ceiling; "
-                f"refused before dispatch")
+                f"refused before dispatch"
+            )
         return handler(request)
 
     def after_model(self, state, runtime=None):
@@ -143,5 +154,6 @@ class BudgetGuard(AgentMiddleware):
             # checkpointed by run.py, so resuming later is free.
             raise MissionPaused(
                 f"ceiling ${self.ceiling:.2f} hit at ${self.spent:.2f}; "
-                f"cache hit rate {self.cache_hit_rate():.0%}")
+                f"cache hit rate {self.cache_hit_rate():.0%}"
+            )
         return None

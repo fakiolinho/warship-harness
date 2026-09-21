@@ -4,6 +4,7 @@ agent = model + harness. The model supplies reasoning; these modules supply
 the permission gate, bounded context, budget ceiling, checkpointed state,
 reviewed memory, and the task economics ledger.
 """
+
 from . import ledger, memory, state
 from .budget import BudgetGuard, MissionPaused
 from .context import BoundedToolOutput, bounded

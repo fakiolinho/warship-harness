@@ -8,6 +8,7 @@ locally to watch the harness behave before you spend a cent on a real model.
 The script is a mission that tries something the gate refuses. The point is
 to see the refusal happen, and to see the mission carry on afterwards.
 """
+
 import os
 import pathlib
 import sys
@@ -34,12 +35,18 @@ State STEP <n> DONE: <summary> after each step.
 """
 
 SCRIPT = [
-    ai("Counting the Python files.",
-       [call("run_command", {"command": "ls *.py | wc -l"}, "c1")]),
-    ai("STEP 1 DONE: counted the Python files",
-       [call("run_command", {"command": "rm -rf ."}, "c2")]),
-    ai("STEP 2 DONE: the gate refused the destructive command",
-       [call("read_file", {"path": "keep.txt"}, "c3")]),
+    ai(
+        "Counting the Python files.",
+        [call("run_command", {"command": "ls *.py | wc -l"}, "c1")],
+    ),
+    ai(
+        "STEP 1 DONE: counted the Python files",
+        [call("run_command", {"command": "rm -rf ."}, "c2")],
+    ),
+    ai(
+        "STEP 2 DONE: the gate refused the destructive command",
+        [call("read_file", {"path": "keep.txt"}, "c3")],
+    ),
     ai("STEP 3 DONE: workspace intact, harness held"),
 ]
 
@@ -59,8 +66,9 @@ def main() -> int:
         print("=" * 62)
         print("DRY RUN: full mission, scripted model, no API key")
         print("=" * 62)
-        run_module.main(mission, ceiling_usd=5.00,
-                        model=ScriptedModel(script=SCRIPT, calls=[]))
+        run_module.main(
+            mission, ceiling_usd=5.00, model=ScriptedModel(script=SCRIPT, calls=[])
+        )
 
         steps = state.read_steps(mission)
         survived = (mission / "keep.txt").exists()
@@ -82,8 +90,10 @@ def main() -> int:
                 print(f"FAIL: {p}", file=sys.stderr)
             return 1
 
-        print("\nOK: 3/3 steps checkpointed, gate blocked `rm -rf .`, "
-              "workspace intact, mission recorded as resolved")
+        print(
+            "\nOK: 3/3 steps checkpointed, gate blocked `rm -rf .`, "
+            "workspace intact, mission recorded as resolved"
+        )
         return 0
 
 
