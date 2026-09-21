@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A minimal, real agent harness on LangChain `create_agent`, implementing the
-components from "The Agent Harness" report: agent = model + harness.
+components from [The Agent Harness](https://mariosfakiolas.com/publications/agent-harness) report: agent = model + harness.
 
 The model supplies reasoning. The harness supplies everything that makes it
 usable in production: a permission gate outside the model's code path, bounded
@@ -15,6 +15,14 @@ that proves the value in numbers.
 
 It is about 1,800 lines. You can read all of it in one sitting, and it is meant
 to be copied into your own project rather than installed as a dependency.
+
+**Why LangChain and not the Claude Agent SDK?** The SDK ships the loop and a
+harness — Claude Code's engine, pre-tuned, with built-in tools. `create_agent`
+ships the loop only. This repo exists to show what a harness *is*, so every
+control here is hand-built and visible on purpose. Prototype on the SDK when
+you need an answer by Friday. Build on a bare loop when the harness is your
+judgment and you need to own every rule of it. This repo takes the second
+road.
 
 ## See it work, without an API key
 
@@ -507,6 +515,12 @@ Every variable is optional except the API key. See [.env.example](.env.example).
 See [CONTRIBUTING.md](CONTRIBUTING.md). [AGENTS.md](AGENTS.md) is the
 orientation for AI coding assistants and for humans arriving cold: commands,
 layout, the invariants that must not be broken, and the gotchas.
+
+## The report
+
+This repo is the reference implementation for
+[The Agent Harness](https://mariosfakiolas.com/publications/agent-harness) — the components, the
+arithmetic behind the four numbers, and the operating cadence, in full.
 
 ## License
 
