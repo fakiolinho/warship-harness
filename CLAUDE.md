@@ -6,6 +6,7 @@ the invariants that must not be broken, conventions, and gotchas.
 Quick version:
 
 ```bash
+pre-commit install    # hook runs the checks below on every commit
 python selfcheck.py   # fast smoke test, no API key
 pytest                # full suite, no API key, no network
 ruff check .          # lint

@@ -106,3 +106,27 @@ def test_the_untested_part_of_the_container_setup_is_still_flagged():
             assert re.search(r"not (?:covered|exercised)|is not, because|"
                              r"still unverified|NOT covered", text), (
                 f"{doc} shows docker run without flagging the untested mounts")
+
+
+def test_the_hook_runs_what_ci_runs():
+    """A hook that checks less than CI gives false confidence; one that
+    checks more gets bypassed. They drift apart silently, so tie them."""
+    hook = (ROOT / ".pre-commit-config.yaml").read_text()
+    ci = (ROOT / ".github/workflows/ci.yml").read_text()
+    for command in ("python selfcheck.py", "python -m pytest",
+                    "run_gate_eval.py --min-deny-recall 1.0"):
+        stem = command.replace("python -m ", "").replace("python ", "")
+        assert stem.split()[0] in hook, f"hook is missing {stem}"
+        assert stem.split()[0] in ci, f"ci is missing {stem}"
+
+
+def test_the_hook_does_not_reformat_the_codebase():
+    """ruff format reflows ~1,800 lines of hand wrapped comments. The
+    layout is part of how this repo is meant to be read."""
+    hook = (ROOT / ".pre-commit-config.yaml").read_text()
+    # What the hook RUNS, not what its comments discuss.
+    entries = [ln.split("entry:", 1)[1].strip()
+               for ln in hook.splitlines() if "entry:" in ln]
+    assert entries, "no hook entries found; config shape changed?"
+    assert not any("ruff format" in e for e in entries)
+    assert any("ruff check --fix" in e for e in entries)

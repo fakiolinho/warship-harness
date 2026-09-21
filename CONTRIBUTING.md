@@ -17,11 +17,28 @@ pip install -r requirements-dev.txt
 
 ## The loop
 
+Install the hook once and it runs these for you on every commit:
+
+```bash
+pre-commit install
+```
+
+Or run them by hand:
+
 ```bash
 python selfcheck.py     # fast smoke test, no API key, no pytest
 pytest                  # full suite, no API key, no network
 ruff check .            # lint
 ```
+
+The hook runs the same checks CI runs, so a commit that passes locally
+passes there. It takes a few seconds. `git commit --no-verify` skips it
+when you want to record work in progress.
+
+There is deliberately no `ruff format`. The comments here are wrapped by
+hand so the reasoning lines up with the code it explains, and the
+formatter reflows about 1,800 lines of that. Lint autofix is safe; a
+reformat is not.
 
 All three must pass before you open a pull request. CI runs exactly these
 on Python 3.10 through 3.13, so a green local run means a green CI run.

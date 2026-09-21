@@ -22,6 +22,7 @@ and copied into other projects. Optimize for legibility, not extensibility.
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
+pre-commit install    # runs the three below on every commit
 python selfcheck.py   # fast smoke test: no pytest, no API key
 pytest                # full suite: no API key, no network
 ruff check .          # lint

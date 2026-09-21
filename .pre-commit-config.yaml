@@ -1,0 +1,61 @@
+# Runs the same checks CI runs, so a commit that passes here passes there.
+#
+#     pip install -r requirements-dev.txt
+#     pre-commit install
+#
+# Deliberately no `ruff format`. This codebase wraps its comments by hand
+# so the reasoning lines up with the code it explains, and the formatter
+# reflows about 1,800 lines of that. Lint autofix is safe; reformatting is
+# not, and the layout is part of how the repo is meant to be read.
+#
+# The whole thing takes a few seconds. `git commit --no-verify` skips it
+# when you need to record work in progress.
+
+default_install_hook_types: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+
+  # Local hooks on purpose: they use the tools already in your venv, which
+  # are the versions CI installs from requirements-dev.txt. Pinning
+  # separate versions here is how a hook and its CI job drift apart.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint, with autofix)
+        entry: ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: selfcheck
+        name: selfcheck (no API key)
+        entry: python selfcheck.py
+        language: system
+        pass_filenames: false
+        files: ^(harness/|finops\.py|selfcheck\.py)
+
+      - id: pytest
+        name: pytest (no API key, no network)
+        entry: python -m pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: gate-eval
+        name: gate eval (deny recall floor)
+        entry: python evals/run_gate_eval.py --min-deny-recall 1.0
+        language: system
+        pass_filenames: false
+        files: ^(harness/gate\.py|evals/)
