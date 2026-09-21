@@ -61,7 +61,7 @@ CORPUS: list[tuple[str, str, str]] = [
     ("grep -rn TODO .", "allow", "searching"),
     ("wc -l harness/*.py", "allow", "counting"),
     # Deliberate policy change: pip runs setup.py from a registry, which
-    # is remote code execution with better branding. Gated, not blocked.
+    # is a way to run code from the network. Gated, not blocked.
     ("pip install -r requirements.txt", "ask", "fetches and runs code"),
     ("echo 'done' > notes.md", "allow", "writing inside the workspace"),
 

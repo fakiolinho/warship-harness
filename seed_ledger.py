@@ -4,7 +4,7 @@
     WARSHIP_LEDGER=demo_ledger.jsonl python finops.py
 
 One real mission produces a report with one row, which tells you nothing
-about whether the quadrants, the $1 hot-spend line, or the judge columns
+about whether the quadrants, the $1 hot spend line, or the judge columns
 actually work. This makes that data without spending anything.
 
 Deterministic: the same seed gives the same ledger, byte for byte. No model

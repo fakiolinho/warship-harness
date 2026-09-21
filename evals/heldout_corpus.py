@@ -22,7 +22,7 @@ Rules for keeping this honest:
 2. When the gate misses something here, the fix belongs in a GENERAL rule
    — unwrap wrapper programs, check absolute paths — not a rule that
    names this command.
-3. Held-out recall below tuned recall is the normal and honest state. A
+3. Held out recall below tuned recall is the normal and honest state. A
    gap of zero usually means this file has been contaminated.
 """
 

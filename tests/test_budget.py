@@ -196,7 +196,7 @@ def test_a_malformed_request_does_not_crash_the_guard():
 
 def test_a_ceiling_below_the_single_call_floor_says_so():
     """Otherwise a $0.05 ceiling refuses a two token prompt while claiming
-    it "could cost" twelve cents, which is true and useless."""
+    it "could cost" twelve cents, which is accurate and unhelpful."""
     from langchain_core.messages import HumanMessage
     g = BudgetGuard(ceiling_usd=0.05, max_output_tokens=8_000)
     with pytest.raises(MissionPaused, match="below the .* floor"):

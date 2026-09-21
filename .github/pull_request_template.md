@@ -21,7 +21,7 @@
 <!--
 AGENTS.md lists the invariants this project protects: the gate outside the
 model's code path, the stable cacheable prefix, controls that can say no,
-human-reviewed memory, idempotent checkpointing, deterministic FinOps math,
+human reviewed memory, idempotent checkpointing, deterministic FinOps math,
 and an offline test suite.
 
 Does this touch any of them? If yes, make the case. If no, say "none".

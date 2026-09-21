@@ -53,7 +53,7 @@ Full list in `.env.example`.
 |---|---|
 | `harness/gate.py` | allow / ask / deny on every tool call. Deny wins. |
 | `harness/context.py` | cap tool output entering context, spill the rest to disk |
-| `harness/budget.py` | per-mission cost ceiling; pauses instead of burning |
+| `harness/budget.py` | per mission cost ceiling; pauses instead of burning |
 | `harness/state.py` | checkpoint + resume; a crash at step 40 resumes at 40 |
 | `harness/memory.py` | distill → pending → **human approves** → loaded |
 | `harness/ledger.py` | every model call and mission outcome, as JSONL |
@@ -61,10 +61,10 @@ Full list in `.env.example`.
 | `finops.py` | deterministic task economics report; five quadrants, incl. CHEAP MISS |
 | `agent.py` | wires the stack onto `create_agent`, plus two demo tools |
 | `run.py` | mission entrypoint: stream, checkpoint, record outcome |
-| `selfcheck.py` | assert-based smoke test of every component |
+| `selfcheck.py` | assert based smoke test of every component |
 | `seed_ledger.py` | fabricate a ledger so the report has volume to exercise |
 | `Dockerfile` | the real sandbox boundary; see README "Why the container" |
-| `tests/` | pytest suite, including end-to-end via a scripted model |
+| `tests/` | pytest suite, including end to end via a scripted model |
 | `evals/` | does it *behave* — gate corpus (offline, in CI) and model evals (opt in) |
 
 ## Invariants — do not break these
@@ -87,11 +87,11 @@ to argue for itself explicitly, not slip through.
 
 3. **Every control must be able to say no.** The budget ceiling raises
    `MissionPaused`. The gate returns an error `ToolMessage`. With no TTY,
-   an `ask` verdict is **declined**, never auto-approved. Unattended runs
+   an `ask` verdict is **declined**, never auto approved. Unattended runs
    must not approve themselves.
 
-4. **Memory is human-reviewed.** `pending.md` → a person reads it →
-   `approved.md`. Never auto-promote. Approved memory lands in the system
+4. **Memory is human reviewed.** `pending.md` → a person reads it →
+   `approved.md`. Never auto promote. Approved memory lands in the system
    prompt of every later mission; it is a durable injection surface.
 
 5. **Checkpointing is idempotent.** `state.checkpoint()` upserts by step
@@ -102,15 +102,15 @@ to argue for itself explicitly, not slip through.
    Math that goes in front of a board should not hallucinate. The LLM judge
    does not break this: it runs at *record* time and writes a verdict into
    the ledger with its model and rubric version, so the report is still pure
-   arithmetic over recorded facts and re-running it on the same ledger gives
+   arithmetic over recorded facts and rerunning it on the same ledger gives
    the same numbers. A judge called from inside the report would break it.
 
 7. **The gate is measured against a corpus it was not tuned on.**
    `evals/run_gate_eval.py` scores two: `gate_corpus.py` (written
    alongside the rules, so a regression test) and `heldout_corpus.py`
    (the measurement). Quoting the tuned number alone is how "100% deny
-   recall" was reported while twelve of fifteen held-out commands walked
-   through. Never add a case to the held-out file because the gate fails
+   recall" was reported while twelve of fifteen held out commands walked
+   through. Never add a case to the held out file because the gate fails
    it — fix the rule generally, then add the case to the tuned corpus.
 
    Rules judge the program, not the text: wrappers (`env`, `nohup`,
@@ -167,11 +167,11 @@ finish, in plain declarative sentences. Keep it.
 - `msg.text` on a LangChain message is a `TextAccessor`, not a `str`.
   `run.py` wraps it in `str()`. Do not call it as `.text()` — deprecated.
 - `SummarizationMiddleware` needs a real model, so `build_agent` skips it
-  when a non-string model is injected. That is why tests pass
+  when a non string model is injected. That is why tests pass
   `compaction_model=None`.
 - The ledger path is resolved per call via `WARSHIP_LEDGER`, not captured
   at import. Tests rely on this to stay out of the repo's own ledger.
-- `agent.WORKSPACE` is a module-level global set by `run.py`. Tools are
+- `agent.WORKSPACE` is a module level global set by `run.py`. Tools are
   confined to it. Tests call `set_workspace()` directly.
 - `harness/` shadows nothing, but `agent.py` and `run.py` are top-level
   modules, not a package. `pyproject.toml` sets `pythonpath = [".", "tests"]`

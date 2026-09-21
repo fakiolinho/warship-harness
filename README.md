@@ -13,13 +13,26 @@ context, compaction, a step ceiling, checkpointed state with resume, a budget
 circuit breaker, a human reviewed memory loop, and a task economics ledger
 that proves the value in numbers.
 
+If you have tried to put an agent into production and it went badly, the gap
+is usually not your engineers and not the model. Almost every agent example
+is a model in a loop, which is plenty for a demo and not enough for a Tuesday:
+the laptop sleeps and the run dies, the context fills up, the spend is real
+but nobody can say what it bought. The parts that fix that rarely ship with
+the example, so most teams meet them one incident at a time. This repo is
+those parts, written out plainly so you can see what each one does and decide
+which of them you actually need.
+
+Nothing here is clever. Each component is small enough to read in a few
+minutes, and the comments explain why a control exists rather than what the
+line does. If a piece does not fit your situation, take the ones that do.
+
 It is about 1,800 lines. You can read all of it in one sitting, and it is meant
 to be copied into your own project rather than installed as a dependency.
 
 **Why LangChain and not the Claude Agent SDK?** The SDK ships the loop and a
-harness — Claude Code's engine, pre-tuned, with built-in tools. `create_agent`
+harness — Claude Code's engine, pre-tuned, with built in tools. `create_agent`
 ships the loop only. This repo exists to show what a harness *is*, so every
-control here is hand-built and visible on purpose. Prototype on the SDK when
+control here is hand built and visible on purpose. Prototype on the SDK when
 you need an answer by Friday. Build on a bare loop when the harness is your
 judgment and you need to own every rule of it. This repo takes the second
 road.
@@ -241,7 +254,7 @@ failure the step count cannot see.
 The verdict, its score, the failing step numbers, the judge model, and the
 rubric version all go into the ledger. **`finops.py` still never calls a
 model**: the judge runs at record time and the report stays deterministic
-arithmetic over recorded facts, so re-running it on the same ledger always
+arithmetic over recorded facts, so rerunning it on the same ledger always
 gives the same numbers. `RUBRIC_VERSION` is recorded because changing the
 rubric makes new verdicts incomparable to old ones.
 
@@ -255,7 +268,7 @@ costs one extra model call per mission, which is why it is opt in.
 ## Generating data to play with
 
 One real mission produces a report with one row, which tells you nothing
-about whether the quadrants or the `$1` hot-spend line behave. Fabricate
+about whether the quadrants or the `$1` hot spend line behave. Fabricate
 some:
 
 ```bash
@@ -403,8 +416,8 @@ result did not change:
 | round | what was measured | result |
 |---|---|---|
 | 1 | substring rules, against the tuning corpus | 30% deny recall |
-| 2 | token-aware rules, against 15 held-out commands | 12 of 15 allowed |
-| 3 | wrapper-aware rules, against 11 novel commands | 9 of 11 allowed |
+| 2 | token aware rules, against 15 held out commands | 12 of 15 allowed |
+| 3 | wrapper aware rules, against 11 novel commands | 9 of 11 allowed |
 
 Each round fixed that round's misses and the next round found more. Deny
 recall measures the imagination of whoever wrote the corpus. It is a
@@ -467,8 +480,8 @@ files.
 
 The first row is where most people start and why nothing goes wrong early.
 The README tells you to move to the second row — *run missions server
-side, never on a laptop* — and that is the move that makes this
-non-optional.
+side, never on a laptop* — and that is the move where the
+container stops being optional.
 
 ## Hardening for production
 

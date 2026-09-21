@@ -32,13 +32,14 @@ deliberate simplifications, each marked `ponytail:` in the source:
 **`read_file` is confined to the workspace; `run_command` is not and
 cannot be.** `sh -c` reaches anything the invoking user reaches, so
 `cat /etc/passwd` succeeds. The confinement is defence in depth against a
-model that wanders, not a boundary against one being steered. Do not read
-it as more than that: an asymmetric control mistaken for a real one is
-worse than no control.
+model that wanders, not a boundary against one being steered. It is worth
+being clear about that, because a partial control is easy to mistake for a
+complete one, and that mistake is more dangerous than having no control at
+all.
 
 The real boundary is the process boundary. See `Dockerfile`. CI builds it
 on every push and asserts that the agent user cannot write to `/etc`, so
-the image itself is tested; the bind-mount and `-u` setup in the README
+the image itself is tested; the bind mount and `-u` setup in the README
 is not, because CI runs it without host mounts.
 
 ## Prompt injection through tool output
@@ -57,7 +58,7 @@ output. Two places consume it:
   escalates. Measured on `claude-sonnet-4-5`, the judge refused all four
   payloads and flagged every one; run
   `python evals/run_online_evals.py --only judge_injection --repeat 10`
-  to re-measure, because one sample is not a rate. This is still
+  to remeasure, because one sample is not a rate. This is still
   mitigation, not a boundary — the payloads are ones we thought of — so
   treat a verdict from a mission that touched untrusted content as
   advisory.
@@ -85,7 +86,7 @@ repository; think before pointing it at anything sensitive.
    and revocable on their own. Never a human's personal token.
 3. **Run in a container** whose filesystem is the workspace, with the
    network restricted to what the mission needs. This is the upgrade path
-   named in `agent.py`, and it is the single highest-value hardening step.
+   named in `agent.py`, and it is the single highest value hardening step.
 4. **Set `WARSHIP_NONINTERACTIVE=1`** for unattended runs. With no TTY
    there is nobody to approve an `ask` verdict, so the harness declines it
    rather than proceeding. Verify this holds in your deployment.
@@ -103,7 +104,7 @@ repository; think before pointing it at anything sensitive.
 `ANTHROPIC_API_KEY` is read from the environment and never written to disk
 by this project. `ledger.jsonl` records token counts and costs, never
 prompt or response content. Mission `artifacts/` and `state.json`, however,
-hold whatever the tools returned, so treat them as workspace-sensitive.
+hold whatever the tools returned, so treat them as workspace sensitive.
 Both are gitignored.
 
 ## Supported versions

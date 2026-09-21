@@ -9,7 +9,7 @@ how much either can be trusted.
 Where it sits. The judge runs at RECORD time and writes its verdict into the
 ledger as an observation, with the model and rubric version that produced it.
 finops.py stays deterministic arithmetic over recorded facts and never calls
-a model, so re-running the report on the same ledger always gives the same
+a model, so rerunning the report on the same ledger always gives the same
 numbers. A judge called from inside the report would break that.
 
 What it is not. A judge is a measurement, not an oracle. It has its own
